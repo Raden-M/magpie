@@ -1,23 +1,35 @@
+mod api;
 mod config;
 mod db;
 mod error;
+mod state;
+mod url_canon;
 mod util;
+
+use std::sync::Arc;
 
 use axum::Router;
 use axum::routing::get;
 use clap::Parser;
 
 use crate::config::Config;
+use crate::db::Db;
+use crate::state::AppState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = Config::parse();
     init_tracing(&config.log);
 
-    let app = Router::new().route("/healthz", get(healthz));
+    let db = Db::open(&config.data_dir)?;
+    let state = AppState { db, config: Arc::new(config.clone()) };
+
+    let app = Router::new()
+        .route("/healthz", get(healthz))
+        .merge(api::router(state));
 
     let listener = tokio::net::TcpListener::bind(config.bind).await?;
-    tracing::info!(bind = %config.bind, "magpie listening");
+    tracing::info!(bind = %config.bind, data_dir = %config.data_dir.display(), "magpie listening");
     axum::serve(listener, app).await?;
     Ok(())
 }

@@ -1,5 +1,6 @@
 //! Small cross-cutting helpers: time-ordered ids and RFC3339 UTC timestamps.
 
+use sha2::{Digest, Sha256};
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 use uuid::Uuid;
@@ -20,4 +21,15 @@ pub fn now_iso() -> String {
 /// Derived reading time in whole minutes, at ~200 words per minute, floored to 1.
 pub fn reading_minutes(word_count: i64) -> i64 {
     ((word_count + 199) / 200).max(1)
+}
+
+/// Lowercase hex SHA-256 of a byte slice - the content-address of a media blob.
+pub fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut out = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        use std::fmt::Write;
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
 }

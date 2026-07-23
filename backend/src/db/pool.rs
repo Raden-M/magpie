@@ -3,6 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
+use anyhow::Context;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::Connection;
@@ -23,9 +24,11 @@ impl Db {
     /// Open the pool against `<data_dir>/magpie.db`, applying migrations. Creates
     /// the data directory and its `snapshots`/`media` subdirectories if missing;
     /// safe to call on an existing directory (idempotent init).
-    pub fn open(data_dir: &Path) -> AppResult<Self> {
-        std::fs::create_dir_all(data_dir.join("snapshots"))?;
-        std::fs::create_dir_all(data_dir.join("media"))?;
+    pub fn open(data_dir: &Path) -> anyhow::Result<Self> {
+        std::fs::create_dir_all(data_dir.join("snapshots"))
+            .with_context(|| format!("creating {}", data_dir.join("snapshots").display()))?;
+        std::fs::create_dir_all(data_dir.join("media"))
+            .with_context(|| format!("creating {}", data_dir.join("media").display()))?;
 
         let manager = SqliteConnectionManager::file(data_dir.join("magpie.db"))
             .with_init(|conn| {
@@ -36,14 +39,11 @@ impl Db {
                      PRAGMA synchronous = NORMAL;",
                 )
             });
-        let pool = Pool::builder()
-            .build(manager)
-            .map_err(|e| AppError::Internal(e.into()))?;
+        let pool = Pool::builder().build(manager).context("building SQLite pool")?;
 
-        let mut conn = pool.get()?;
-        super::migrations()
-            .to_latest(&mut conn)
-            .map_err(|e| AppError::Internal(e.into()))?;
+        let mut conn = pool.get().context("checking out a connection")?;
+        super::migrations().to_latest(&mut conn).context("applying migrations")?;
+        drop(conn);
 
         Ok(Db { pool, data_dir: data_dir.to_path_buf() })
     }
