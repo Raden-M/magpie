@@ -1,23 +1,10 @@
-mod api;
-mod config;
-mod cursor;
-mod db;
-mod error;
-mod reader;
-mod state;
-mod url_canon;
-mod util;
-mod web;
-
 use std::sync::Arc;
 
-use axum::Router;
-use axum::routing::get;
 use clap::Parser;
 
-use crate::config::Config;
-use crate::db::Db;
-use crate::state::AppState;
+use magpie::config::Config;
+use magpie::db::Db;
+use magpie::state::AppState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -28,18 +15,10 @@ async fn main() -> anyhow::Result<()> {
     let db = Db::open(&config.data_dir)?;
     let state = AppState { db, config: Arc::new(config.clone()) };
 
-    let app = Router::new()
-        .route("/healthz", get(healthz))
-        .merge(api::router(state));
-
     let listener = tokio::net::TcpListener::bind(config.bind).await?;
     tracing::info!(bind = %config.bind, data_dir = %config.data_dir.display(), "magpie listening");
-    axum::serve(listener, app).await?;
+    axum::serve(listener, magpie::app(state)).await?;
     Ok(())
-}
-
-async fn healthz() -> &'static str {
-    "ok"
 }
 
 /// Fail fast on foot-guns before opening the database (docs/08-deployment.md).
