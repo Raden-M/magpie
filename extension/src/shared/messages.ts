@@ -20,3 +20,10 @@ export type CaptureResultMessage =
   | { ok: false; error: string };
 
 export const CAPTURE_MESSAGE = "magpie-capture" as const;
+
+/** Sent from the service worker to the content script to trigger a capture of
+ *  the current selection (from the context menu or keyboard command). */
+export interface TriggerCaptureMessage {
+  type: "magpie-trigger-capture";
+}
+export const TRIGGER_CAPTURE = "magpie-trigger-capture" as const;

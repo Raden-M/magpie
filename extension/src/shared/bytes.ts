@@ -20,3 +20,12 @@ export function base64ToBlob(base64: string, mime: string): Blob {
   }
   return new Blob([bytes], { type: mime });
 }
+
+/** Lowercase hex SHA-256 of a string or buffer - the content-address. */
+export async function sha256Hex(data: ArrayBuffer | string): Promise<string> {
+  const buffer = typeof data === "string" ? new TextEncoder().encode(data) : data;
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}

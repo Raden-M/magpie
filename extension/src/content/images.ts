@@ -6,6 +6,8 @@
 // Fetches run in the page's context, so cross-origin images without permissive
 // CORS may not be retrievable in the MVP; those are simply left unstored.
 
+import { sha256Hex } from "../shared/bytes.js";
+
 export interface CollectedImage {
   hash: string;
   blob: Blob;
@@ -14,13 +16,6 @@ export interface CollectedImage {
 }
 
 const DEFAULT_MAX_COUNT = 60;
-
-async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", buffer);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
 
 /** Choose a single URL for an image, preferring an explicit src over srcset. */
 function pickSource(img: HTMLImageElement): string | null {

@@ -1,0 +1,168 @@
+// The in-page capture UI: a floating pill at the selection (shade picker + Keep
+// + Note) and a result toast. Rendered in a Shadow DOM so the host page's CSS
+// can never touch it. The visual language echoes the app - quiet dark chrome,
+// iridescence only on the shine.
+
+export interface Ui {
+  showPill(rect: DOMRect, shade: string): void;
+  hidePill(): void;
+  showToast(text: string, tone: "ok" | "error"): void;
+  setBusy(busy: boolean): void;
+}
+
+const SHADES: { id: string; grad: string }[] = [
+  { id: "iridescent", grad: "linear-gradient(101deg,#5b7bff,#2cd8d0,#a76bff)" },
+  { id: "blue", grad: "#5b7bff" },
+  { id: "teal", grad: "#2cd8d0" },
+  { id: "purple", grad: "#a76bff" },
+];
+
+const STYLE = `
+:host { all: initial; }
+.pill, .toast { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.pill {
+  position: fixed; z-index: 2147483647; display: flex; align-items: center; gap: 8px;
+  padding: 7px 9px; border-radius: 12px; background: #14161c; color: #ecedf1;
+  box-shadow: 0 8px 30px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.06);
+  opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s;
+}
+.pill.show { opacity: 1; transform: translateY(0); }
+.shades { display: flex; gap: 6px; }
+.shade { width: 16px; height: 16px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.shade.active { border-color: #ecedf1; }
+.sep { width: 1px; height: 20px; background: rgba(255,255,255,.12); }
+.btn {
+  font-size: 12.5px; font-weight: 600; border: none; border-radius: 8px; padding: 6px 11px;
+  cursor: pointer; color: #0c0d11; background: linear-gradient(101deg,#5b7bff,#2cd8d0,#a76bff);
+}
+.btn.ghost { background: transparent; color: #b9bbc4; }
+.btn.ghost:hover { color: #ecedf1; }
+.btn:disabled { opacity: .6; cursor: default; }
+.note { display: none; }
+.note.show { display: block; }
+.note input {
+  font-size: 12.5px; color: #ecedf1; background: #0c0d11; border: 1px solid rgba(255,255,255,.12);
+  border-radius: 8px; padding: 6px 9px; width: 180px; outline: none;
+}
+.toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 8px); z-index: 2147483647;
+  background: #14161c; color: #ecedf1; padding: 11px 16px; border-radius: 12px; font-size: 13px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.06);
+  opacity: 0; transition: opacity .18s, transform .18s; pointer-events: none; max-width: 80vw;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px;
+  background: linear-gradient(101deg,#5b7bff,#2cd8d0,#a76bff); vertical-align: middle; }
+.toast.error .dot { background: #ff6b6b; }
+`;
+
+export function createUi(onKeep: (color: string, note: string | null) => void): Ui {
+  const host = document.createElement("div");
+  host.style.cssText = "all: initial;";
+  const root = host.attachShadow({ mode: "open" });
+  const style = document.createElement("style");
+  style.textContent = STYLE;
+  root.appendChild(style);
+
+  let currentShade = "iridescent";
+  let toastTimer: number | undefined;
+
+  const pill = document.createElement("div");
+  pill.className = "pill";
+  // Preserve the selection when interacting with the pill.
+  pill.addEventListener("mousedown", (e) => e.preventDefault());
+
+  const shades = document.createElement("div");
+  shades.className = "shades";
+  const shadeButtons: HTMLButtonElement[] = [];
+  for (const shade of SHADES) {
+    const dot = document.createElement("button");
+    dot.className = "shade";
+    dot.style.background = shade.grad;
+    dot.title = shade.id;
+    dot.addEventListener("click", () => setShade(shade.id));
+    shades.appendChild(dot);
+    shadeButtons.push(dot);
+  }
+
+  const sep = document.createElement("div");
+  sep.className = "sep";
+
+  const noteWrap = document.createElement("span");
+  noteWrap.className = "note";
+  const noteInput = document.createElement("input");
+  noteInput.type = "text";
+  noteInput.placeholder = "Add a note, then Keep";
+  noteInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") keep();
+  });
+  noteWrap.appendChild(noteInput);
+
+  const noteBtn = document.createElement("button");
+  noteBtn.className = "btn ghost";
+  noteBtn.textContent = "＋ Note";
+  noteBtn.addEventListener("click", () => {
+    noteWrap.classList.toggle("show");
+    if (noteWrap.classList.contains("show")) noteInput.focus();
+  });
+
+  const keepBtn = document.createElement("button");
+  keepBtn.className = "btn";
+  keepBtn.textContent = "Keep";
+  keepBtn.addEventListener("click", () => keep());
+
+  pill.append(shades, sep, noteWrap, noteBtn, keepBtn);
+
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  const toastDot = document.createElement("span");
+  toastDot.className = "dot";
+  const toastText = document.createElement("span");
+  toast.append(toastDot, toastText);
+
+  root.append(pill, toast);
+  document.documentElement.appendChild(host);
+
+  function setShade(id: string): void {
+    currentShade = id;
+    shadeButtons.forEach((btn, i) => btn.classList.toggle("active", SHADES[i].id === id));
+  }
+
+  function keep(): void {
+    const note = noteWrap.classList.contains("show") ? noteInput.value.trim() || null : null;
+    onKeep(currentShade, note);
+  }
+
+  return {
+    showPill(rect, shade) {
+      setShade(shade);
+      noteWrap.classList.remove("show");
+      noteInput.value = "";
+      keepBtn.disabled = false;
+      keepBtn.textContent = "Keep";
+      // Position above the selection, clamped to the viewport.
+      pill.style.visibility = "hidden";
+      pill.classList.add("show");
+      const width = pill.offsetWidth || 240;
+      const top = Math.max(8, rect.top - (pill.offsetHeight || 40) - 8);
+      const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
+      pill.style.top = `${top}px`;
+      pill.style.left = `${left}px`;
+      pill.style.visibility = "visible";
+    },
+    hidePill() {
+      pill.classList.remove("show");
+    },
+    setBusy(busy) {
+      keepBtn.disabled = busy;
+      keepBtn.textContent = busy ? "Keeping…" : "Keep";
+    },
+    showToast(text, tone) {
+      toastText.textContent = text;
+      toast.classList.toggle("error", tone === "error");
+      toast.classList.add("show");
+      window.clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(() => toast.classList.remove("show"), 3800);
+    },
+  };
+}
