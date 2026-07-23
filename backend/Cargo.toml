@@ -1,0 +1,26 @@
+[package]
+name = "magpie"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.104"
+axum = { version = "0.8.9", features = ["multipart"] }
+clap = { version = "4.6.4", features = ["derive", "env"] }
+kuchikiki = "0.8.2"
+maud = { version = "0.27.0", features = ["axum"] }
+r2d2 = "0.8.10"
+r2d2_sqlite = "0.35.0"
+rusqlite = { version = "0.40.1", features = ["bundled"] }
+rusqlite_migration = "2.6.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sha2 = "0.11.0"
+strsim = "0.11.1"
+time = { version = "0.3.54", features = ["formatting", "parsing", "macros"] }
+tokio = { version = "1.53.1", features = ["full"] }
+tower = "0.5.3"
+tower-http = { version = "0.7.0", features = ["cors", "compression-gzip", "trace", "set-header", "limit"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+uuid = { version = "1.24.0", features = ["v7"] }
