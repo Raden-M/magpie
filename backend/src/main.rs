@@ -1,6 +1,7 @@
 mod config;
 mod db;
 mod error;
+mod util;
 
 use axum::Router;
 use axum::routing::get;

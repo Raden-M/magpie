@@ -58,6 +58,15 @@ CREATE TABLE media (
   created_at  TEXT NOT NULL
 );
 
+-- Which media a given snapshot references (parsed from its manifest at capture
+-- time). This is what makes orphan-media garbage collection exact: a media row
+-- is collectable once no snapshot references it and no page uses it as a favicon.
+CREATE TABLE snapshot_media (
+  snapshot_id TEXT NOT NULL REFERENCES snapshot(id) ON DELETE CASCADE,
+  media_hash  TEXT NOT NULL REFERENCES media(hash) ON DELETE CASCADE,
+  PRIMARY KEY (snapshot_id, media_hash)
+);
+
 -- Idempotency ledger: maps a client capture_id to the result it produced, so a
 -- retried capture replays the original response instead of duplicating.
 CREATE TABLE capture_log (
