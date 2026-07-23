@@ -26,7 +26,13 @@ fn test_state() -> (AppState, tempfile::TempDir) {
         log: "warn".into(),
     };
     let db = Db::open(dir.path()).unwrap();
-    (AppState { db, config: Arc::new(config) }, dir)
+    (
+        AppState {
+            db,
+            config: Arc::new(config),
+        },
+        dir,
+    )
 }
 
 fn multipart_capture(payload: &Value) -> Body {
@@ -54,8 +60,7 @@ async fn body_text(response: axum::response::Response) -> String {
 fn capture_payload() -> (Value, String) {
     // A deliberately simple article so the backend's normalized text equals the
     // content_text an extension would compute - the round-trip precondition.
-    let content_html =
-        "<article><p>The quick brown fox jumps over the lazy dog.</p></article>";
+    let content_html = "<article><p>The quick brown fox jumps over the lazy dog.</p></article>";
     let content_text = normalize_str("The quick brown fox jumps over the lazy dog.");
 
     // Position offsets exactly as a correct extension would compute them.
@@ -103,7 +108,10 @@ async fn capture_read_search_round_trip() {
             Request::builder()
                 .method("POST")
                 .uri("/api/captures")
-                .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={BOUNDARY}"))
+                .header(
+                    header::CONTENT_TYPE,
+                    format!("multipart/form-data; boundary={BOUNDARY}"),
+                )
                 .body(multipart_capture(&payload))
                 .unwrap(),
         )
@@ -119,7 +127,12 @@ async fn capture_read_search_round_trip() {
     // 2. Page JSON: one highlight, a snapshot present.
     let response = app
         .clone()
-        .oneshot(Request::builder().uri(format!("/api/pages/{page_id}")).body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/pages/{page_id}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
@@ -142,12 +155,20 @@ async fn capture_read_search_round_trip() {
     assert_eq!(response.status(), StatusCode::OK);
     let html = body_text(response).await;
     let expected_mark = format!("id=\"hl-{highlight_id}\">{quote}</mark>");
-    assert!(html.contains(&expected_mark), "reader HTML must bake <mark> on the exact quote");
+    assert!(
+        html.contains(&expected_mark),
+        "reader HTML must bake <mark> on the exact quote"
+    );
 
     // 4. Search: a content-only term groups under the page.
     let response = app
         .clone()
-        .oneshot(Request::builder().uri("/api/search?q=lazy").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/api/search?q=lazy")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     let results = body_json(response).await;
@@ -163,7 +184,10 @@ async fn capture_read_search_round_trip() {
             Request::builder()
                 .method("POST")
                 .uri("/api/captures")
-                .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={BOUNDARY}"))
+                .header(
+                    header::CONTENT_TYPE,
+                    format!("multipart/form-data; boundary={BOUNDARY}"),
+                )
                 .body(multipart_capture(&payload))
                 .unwrap(),
         )
@@ -172,7 +196,10 @@ async fn capture_read_search_round_trip() {
     assert_eq!(response.status(), StatusCode::CREATED);
     let replayed = body_json(response).await;
     assert_eq!(replayed["highlight"]["id"], highlight_id.as_str());
-    assert_eq!(replayed["page"]["highlight_count"], 1, "replay must not duplicate");
+    assert_eq!(
+        replayed["page"]["highlight_count"], 1,
+        "replay must not duplicate"
+    );
 }
 
 #[tokio::test]
@@ -199,7 +226,10 @@ async fn page_only_capture_has_no_highlight() {
             Request::builder()
                 .method("POST")
                 .uri("/api/captures")
-                .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={BOUNDARY}"))
+                .header(
+                    header::CONTENT_TYPE,
+                    format!("multipart/form-data; boundary={BOUNDARY}"),
+                )
                 .body(multipart_capture(&payload))
                 .unwrap(),
         )

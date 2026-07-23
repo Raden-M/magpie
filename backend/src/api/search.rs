@@ -65,7 +65,10 @@ pub async fn search(
     };
 
     let Some(match_query) = params.q.as_deref().and_then(search::to_match_query) else {
-        return Ok(Json(SearchResponse { results: Vec::new(), next_cursor: None }));
+        return Ok(Json(SearchResponse {
+            results: Vec::new(),
+            next_cursor: None,
+        }));
     };
 
     let groups = state
@@ -79,7 +82,10 @@ pub async fn search(
         .skip(offset)
         .take(limit)
         .map(|g| PageResult {
-            page: PageRef { id: g.page_id, title: g.page_title },
+            page: PageRef {
+                id: g.page_id,
+                title: g.page_title,
+            },
             hits: g
                 .hits
                 .into_iter()
@@ -105,5 +111,8 @@ pub async fn search(
     let next_cursor =
         (offset + limit < total).then(|| cursor::encode("s", &(offset + limit).to_string()));
 
-    Ok(Json(SearchResponse { results, next_cursor }))
+    Ok(Json(SearchResponse {
+        results,
+        next_cursor,
+    }))
 }

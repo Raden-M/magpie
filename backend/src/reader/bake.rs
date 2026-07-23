@@ -35,7 +35,10 @@ struct Segment {
 }
 
 fn char_to_byte(s: &str, char_idx: usize) -> usize {
-    s.char_indices().nth(char_idx).map(|(b, _)| b).unwrap_or(s.len())
+    s.char_indices()
+        .nth(char_idx)
+        .map(|(b, _)| b)
+        .unwrap_or(s.len())
 }
 
 fn make_mark(hl_id: &str, color: &str, first: bool) -> NodeRef {
@@ -43,17 +46,26 @@ fn make_mark(hl_id: &str, color: &str, first: bool) -> NodeRef {
     let mut attrs: Vec<(ExpandedName, Attribute)> = vec![
         (
             ExpandedName::new(ns!(), LocalName::from("class")),
-            Attribute { prefix: None, value: format!("hl hl-{color}") },
+            Attribute {
+                prefix: None,
+                value: format!("hl hl-{color}"),
+            },
         ),
         (
             ExpandedName::new(ns!(), LocalName::from("data-hl")),
-            Attribute { prefix: None, value: hl_id.to_string() },
+            Attribute {
+                prefix: None,
+                value: hl_id.to_string(),
+            },
         ),
     ];
     if first {
         attrs.push((
             ExpandedName::new(ns!(), LocalName::from("id")),
-            Attribute { prefix: None, value: format!("hl-{hl_id}") },
+            Attribute {
+                prefix: None,
+                value: format!("hl-{hl_id}"),
+            },
         ));
     }
     NodeRef::new_element(name, attrs)
@@ -156,7 +168,9 @@ fn mark_first_segments(per_piece: &mut HashMap<usize, Vec<Segment>>) {
     let mut first_pos: HashMap<String, (usize, usize)> = HashMap::new();
     for (&piece, segs) in per_piece.iter() {
         for seg in segs {
-            let entry = first_pos.entry(seg.hl_id.clone()).or_insert((piece, seg.start));
+            let entry = first_pos
+                .entry(seg.hl_id.clone())
+                .or_insert((piece, seg.start));
             if (piece, seg.start) < *entry {
                 *entry = (piece, seg.start);
             }
@@ -220,7 +234,13 @@ mod tests {
     use super::*;
 
     fn sel<'a>(quote: &'a str, prefix: &'a str, suffix: &'a str) -> Selectors<'a> {
-        Selectors { quote_exact: quote, quote_prefix: prefix, quote_suffix: suffix, pos_start: None, pos_end: None }
+        Selectors {
+            quote_exact: quote,
+            quote_prefix: prefix,
+            quote_suffix: suffix,
+            pos_start: None,
+            pos_end: None,
+        }
     }
 
     #[test]
@@ -264,8 +284,11 @@ mod tests {
     #[test]
     fn orphaned_highlight_is_not_baked() {
         let html = "<article><p>Nothing to see here.</p></article>";
-        let hls =
-            vec![BakeHighlight { id: "h3", color: "iridescent", selectors: sel("xyzzy plugh", "", "") }];
+        let hls = vec![BakeHighlight {
+            id: "h3",
+            color: "iridescent",
+            selectors: sel("xyzzy plugh", "", ""),
+        }];
         let res = bake(html, &hls);
         assert!(!res.located.contains("h3"));
         assert!(!res.html.contains("<mark"));

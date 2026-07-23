@@ -34,12 +34,20 @@ pub fn to_match_query(q: &str) -> Option<String> {
         .split_whitespace()
         .map(|t| format!("\"{}\"", t.replace('"', "\"\"")))
         .collect();
-    if terms.is_empty() { None } else { Some(terms.join(" ")) }
+    if terms.is_empty() {
+        None
+    } else {
+        Some(terms.join(" "))
+    }
 }
 
 /// Run search and return page groups sorted best-first (lower BM25 is better).
 /// `cap` bounds how many raw hits of each kind are considered.
-pub fn search(conn: &Connection, match_query: &str, cap: usize) -> rusqlite::Result<Vec<PageGroup>> {
+pub fn search(
+    conn: &Connection,
+    match_query: &str,
+    cap: usize,
+) -> rusqlite::Result<Vec<PageGroup>> {
     let mut groups: Vec<PageGroup> = Vec::new();
     let mut index: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
 
@@ -84,7 +92,16 @@ pub fn search(conn: &Connection, match_query: &str, cap: usize) -> rusqlite::Res
         })?;
         for row in rows {
             let (id, page_id, title, snip, rank) = row?;
-            push(page_id, title, SearchHit { kind: HitKind::Highlight, id, snippet: snip, rank });
+            push(
+                page_id,
+                title,
+                SearchHit {
+                    kind: HitKind::Highlight,
+                    id,
+                    snippet: snip,
+                    rank,
+                },
+            );
         }
     }
 
@@ -112,7 +129,16 @@ pub fn search(conn: &Connection, match_query: &str, cap: usize) -> rusqlite::Res
         })?;
         for row in rows {
             let (id, page_id, title, snip, rank) = row?;
-            push(page_id, title, SearchHit { kind: HitKind::Content, id, snippet: snip, rank });
+            push(
+                page_id,
+                title,
+                SearchHit {
+                    kind: HitKind::Content,
+                    id,
+                    snippet: snip,
+                    rank,
+                },
+            );
         }
     }
 
@@ -142,7 +168,8 @@ mod tests {
             "INSERT INTO snapshot (id, page_id, version, content_path, content_hash, captured_at)
              VALUES ('s1','p1',1,'snapshots/s1.html','h','2026-01-01T00:00:00Z')",
             [],
-        ).unwrap();
+        )
+        .unwrap();
         let rowid: i64 = conn
             .query_row("SELECT rowid FROM snapshot WHERE id='s1'", [], |r| r.get(0))
             .unwrap();

@@ -24,8 +24,12 @@ pub fn latest_snapshot(conn: &Connection, page_id: &str) -> rusqlite::Result<Opt
 }
 
 pub fn get_snapshot(conn: &Connection, id: &str) -> rusqlite::Result<Option<Snapshot>> {
-    conn.query_row("SELECT * FROM snapshot WHERE id = ?1", params![id], Snapshot::from_row)
-        .optional()
+    conn.query_row(
+        "SELECT * FROM snapshot WHERE id = ?1",
+        params![id],
+        Snapshot::from_row,
+    )
+    .optional()
 }
 
 pub fn snapshot_by_version(
@@ -53,7 +57,10 @@ pub fn store_or_reuse(
     if let Some(latest) = latest_snapshot(conn, page_id)?
         && latest.content_hash == input.content_hash
     {
-        return Ok(SnapshotDecision { snapshot: latest, created: false });
+        return Ok(SnapshotDecision {
+            snapshot: latest,
+            created: false,
+        });
     }
 
     let previous_version: Option<i64> = conn.query_row(
@@ -89,7 +96,10 @@ pub fn store_or_reuse(
     )?;
 
     let snapshot = get_snapshot(conn, &id)?.expect("snapshot just inserted");
-    Ok(SnapshotDecision { snapshot, created: true })
+    Ok(SnapshotDecision {
+        snapshot,
+        created: true,
+    })
 }
 
 /// Index a snapshot's normalized plain text into the contentless FTS table.

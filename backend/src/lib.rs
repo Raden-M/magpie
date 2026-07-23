@@ -21,7 +21,9 @@ use crate::state::AppState;
 
 /// Assemble the full application router: liveness plus the API and web UI.
 pub fn app(state: AppState) -> Router {
-    Router::new().route("/healthz", get(healthz)).merge(api::router(state))
+    Router::new()
+        .route("/healthz", get(healthz))
+        .merge(api::router(state))
 }
 
 async fn healthz() -> &'static str {

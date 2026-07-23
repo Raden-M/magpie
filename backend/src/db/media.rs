@@ -10,7 +10,9 @@ use crate::util::now_iso;
 
 pub fn media_exists(conn: &Connection, hash: &str) -> rusqlite::Result<bool> {
     let found: Option<i64> = conn
-        .query_row("SELECT 1 FROM media WHERE hash = ?1", params![hash], |r| r.get(0))
+        .query_row("SELECT 1 FROM media WHERE hash = ?1", params![hash], |r| {
+            r.get(0)
+        })
         .optional()?;
     Ok(found.is_some())
 }

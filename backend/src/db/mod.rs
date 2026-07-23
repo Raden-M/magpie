@@ -80,7 +80,9 @@ mod tests {
             "first_captured_at is preserved"
         );
 
-        let n: i64 = conn.query_row("SELECT count(*) FROM page", [], |r| r.get(0)).unwrap();
+        let n: i64 = conn
+            .query_row("SELECT count(*) FROM page", [], |r| r.get(0))
+            .unwrap();
         assert_eq!(n, 1);
     }
 
@@ -120,7 +122,10 @@ mod tests {
         assert_eq!(reused.snapshot.id, first.snapshot.id);
 
         // Different hash -> new version.
-        let v2 = NewSnapshot { content_hash: "hash-b".into(), ..v1.clone() };
+        let v2 = NewSnapshot {
+            content_hash: "hash-b".into(),
+            ..v1.clone()
+        };
         let bumped = snapshots::store_or_reuse(&conn, &page.id, path_for, &v2).unwrap();
         assert!(bumped.created);
         assert_eq!(bumped.snapshot.version, 2);
@@ -159,15 +164,27 @@ mod tests {
 
         media::insert_media(
             &conn,
-            &Media { hash: "abc".into(), mime: "image/png".into(), byte_size: 10, created_at: String::new() },
+            &Media {
+                hash: "abc".into(),
+                mime: "image/png".into(),
+                byte_size: 10,
+                created_at: String::new(),
+            },
         )
         .unwrap();
         snapshots::link_media(&conn, &snap.id, "abc").unwrap();
 
-        assert!(media::orphan_hashes(&conn).unwrap().is_empty(), "referenced media not orphaned");
+        assert!(
+            media::orphan_hashes(&conn).unwrap().is_empty(),
+            "referenced media not orphaned"
+        );
 
-        conn.execute("DELETE FROM page WHERE id = ?1", [&page.id]).unwrap();
-        assert_eq!(media::orphan_hashes(&conn).unwrap(), vec!["abc".to_string()]);
+        conn.execute("DELETE FROM page WHERE id = ?1", [&page.id])
+            .unwrap();
+        assert_eq!(
+            media::orphan_hashes(&conn).unwrap(),
+            vec!["abc".to_string()]
+        );
     }
 
     #[test]
@@ -190,17 +207,22 @@ mod tests {
         .unwrap();
 
         let hits: i64 = conn
-            .query_row("SELECT count(*) FROM highlight_fts WHERE highlight_fts MATCH 'brown'", [], |r| {
-                r.get(0)
-            })
+            .query_row(
+                "SELECT count(*) FROM highlight_fts WHERE highlight_fts MATCH 'brown'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(hits, 1, "insert trigger indexed the quote");
 
-        conn.execute("DELETE FROM highlight WHERE id='h1'", []).unwrap();
+        conn.execute("DELETE FROM highlight WHERE id='h1'", [])
+            .unwrap();
         let hits: i64 = conn
-            .query_row("SELECT count(*) FROM highlight_fts WHERE highlight_fts MATCH 'brown'", [], |r| {
-                r.get(0)
-            })
+            .query_row(
+                "SELECT count(*) FROM highlight_fts WHERE highlight_fts MATCH 'brown'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(hits, 0, "delete trigger removed the row");
     }

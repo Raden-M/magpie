@@ -39,7 +39,12 @@ pub async fn page(
         .call(move |conn| {
             let rows = pages::list_pages(
                 conn,
-                &PageListQuery { q, sort: PageSort::Recent, limit: LIMIT + 1, after },
+                &PageListQuery {
+                    q,
+                    sort: PageSort::Recent,
+                    limit: LIMIT + 1,
+                    after,
+                },
             )?;
             let stats = stats::stats(conn)?;
             Ok((rows, stats))
@@ -48,7 +53,8 @@ pub async fn page(
 
     let next_cursor = if rows.len() > LIMIT {
         rows.truncate(LIMIT);
-        rows.last().map(|r| cursor::encode(&r.cursor_value, &r.page.id))
+        rows.last()
+            .map(|r| cursor::encode(&r.cursor_value, &r.page.id))
     } else {
         None
     };
@@ -56,18 +62,31 @@ pub async fn page(
     let query = params.q.unwrap_or_default();
     let body = render_body(&query, &rows, &next_cursor, &stats);
     let markup = shell("Collection", &query, body);
-    Ok(([(header::CONTENT_SECURITY_POLICY, PAGE_CSP)], Html(markup.into_string())).into_response())
+    Ok((
+        [(header::CONTENT_SECURITY_POLICY, PAGE_CSP)],
+        Html(markup.into_string()),
+    )
+        .into_response())
 }
 
 fn source_label(row: &PageListRow) -> String {
-    if let Some(site) = row.page.site_name.as_deref().filter(|s| !s.trim().is_empty()) {
+    if let Some(site) = row
+        .page
+        .site_name
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+    {
         return site.to_string();
     }
     url_canon::host_of(&row.page.canonical_url).unwrap_or_else(|| row.page.canonical_url.clone())
 }
 
 fn shiny_count(n: i64) -> String {
-    if n == 1 { "1 shiny thing".to_string() } else { format!("{n} shiny things") }
+    if n == 1 {
+        "1 shiny thing".to_string()
+    } else {
+        format!("{n} shiny things")
+    }
 }
 
 fn render_body(

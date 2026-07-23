@@ -62,14 +62,20 @@ pub async fn list(
         .call(move |conn| {
             Ok(pages::list_pages(
                 conn,
-                &PageListQuery { q, sort, limit: limit + 1, after },
+                &PageListQuery {
+                    q,
+                    sort,
+                    limit: limit + 1,
+                    after,
+                },
             )?)
         })
         .await?;
 
     let next_cursor = if rows.len() > limit {
         rows.truncate(limit);
-        rows.last().map(|r| cursor::encode(&r.cursor_value, &r.page.id))
+        rows.last()
+            .map(|r| cursor::encode(&r.cursor_value, &r.page.id))
     } else {
         None
     };
@@ -105,8 +111,8 @@ pub async fn get(
     let detail = state
         .db
         .call(move |conn| {
-            let page = pages::get_page(conn, &id)?
-                .ok_or_else(|| AppError::not_found("page not found"))?;
+            let page =
+                pages::get_page(conn, &id)?.ok_or_else(|| AppError::not_found("page not found"))?;
             let snapshot = snapshots::latest_snapshot(conn, &page.id)?;
             let highlights = highlights::highlights_for_page(conn, &page.id)?;
             Ok((page, snapshot, highlights))
@@ -134,7 +140,8 @@ pub async fn delete(
             }
 
             let snapshot_paths: Vec<String> = {
-                let mut stmt = conn.prepare("SELECT content_path FROM snapshot WHERE page_id = ?1")?;
+                let mut stmt =
+                    conn.prepare("SELECT content_path FROM snapshot WHERE page_id = ?1")?;
                 let rows = stmt.query_map([&id], |r| r.get::<_, String>(0))?;
                 rows.collect::<rusqlite::Result<_>>()?
             };

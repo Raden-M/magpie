@@ -43,14 +43,20 @@ pub async fn list(
         .call(move |conn| {
             Ok(highlights::list_highlights(
                 conn,
-                &HighlightListQuery { page_id, q, limit: limit + 1, after },
+                &HighlightListQuery {
+                    page_id,
+                    q,
+                    limit: limit + 1,
+                    after,
+                },
             )?)
         })
         .await?;
 
     let next_cursor = if rows.len() > limit {
         rows.truncate(limit);
-        rows.last().map(|r| cursor::encode(&r.cursor_value, &r.highlight.id))
+        rows.last()
+            .map(|r| cursor::encode(&r.cursor_value, &r.highlight.id))
     } else {
         None
     };
@@ -101,7 +107,10 @@ pub async fn delete(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> AppResult<StatusCode> {
-    let removed = state.db.call(move |conn| Ok(highlights::delete_highlight(conn, &id)?)).await?;
+    let removed = state
+        .db
+        .call(move |conn| Ok(highlights::delete_highlight(conn, &id)?))
+        .await?;
     if removed {
         Ok(StatusCode::NO_CONTENT)
     } else {

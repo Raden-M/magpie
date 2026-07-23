@@ -71,7 +71,11 @@ pub fn locate(hay: &[char], sel: &Selectors) -> Option<Located> {
     {
         let (s, e) = (s as usize, e as usize);
         if e <= hay.len() && hay[s..e] == quote[..] {
-            return Some(Located { start: s, end: e, method: AnchorMethod::Position });
+            return Some(Located {
+                start: s,
+                end: e,
+                method: AnchorMethod::Position,
+            });
         }
     }
 
@@ -79,7 +83,11 @@ pub fn locate(hay: &[char], sel: &Selectors) -> Option<Located> {
     let occurrences = find_all(hay, &quote);
     if occurrences.len() == 1 {
         let s = occurrences[0];
-        return Some(Located { start: s, end: s + quote.len(), method: AnchorMethod::Exact });
+        return Some(Located {
+            start: s,
+            end: s + quote.len(),
+            method: AnchorMethod::Exact,
+        });
     }
     if occurrences.len() > 1 {
         let best = occurrences
@@ -87,7 +95,9 @@ pub fn locate(hay: &[char], sel: &Selectors) -> Option<Located> {
             .copied()
             .max_by_key(|&s| {
                 let mut score = 0i64;
-                if !prefix.is_empty() && s >= prefix.len() && window_eq(hay, s - prefix.len(), &prefix)
+                if !prefix.is_empty()
+                    && s >= prefix.len()
+                    && window_eq(hay, s - prefix.len(), &prefix)
                 {
                     score += 2;
                 }
@@ -99,12 +109,19 @@ pub fn locate(hay: &[char], sel: &Selectors) -> Option<Located> {
                 score * 1_000_000 - distance
             })
             .expect("non-empty");
-        return Some(Located { start: best, end: best + quote.len(), method: AnchorMethod::Exact });
+        return Some(Located {
+            start: best,
+            end: best + quote.len(),
+            method: AnchorMethod::Exact,
+        });
     }
 
     // 3. Context search: prefix ... suffix, take the span between.
     if !prefix.is_empty() && !suffix.is_empty() {
-        let prefix_ends: Vec<usize> = find_all(hay, &prefix).into_iter().map(|s| s + prefix.len()).collect();
+        let prefix_ends: Vec<usize> = find_all(hay, &prefix)
+            .into_iter()
+            .map(|s| s + prefix.len())
+            .collect();
         let suffix_starts = find_all(hay, &suffix);
         let mut best: Option<(usize, usize)> = None;
         for &pe in &prefix_ends {
@@ -119,7 +136,11 @@ pub fn locate(hay: &[char], sel: &Selectors) -> Option<Located> {
             }
         }
         if let Some((s, e)) = best {
-            return Some(Located { start: s, end: e, method: AnchorMethod::Context });
+            return Some(Located {
+                start: s,
+                end: e,
+                method: AnchorMethod::Context,
+            });
         }
     }
 
@@ -145,7 +166,11 @@ pub fn locate(hay: &[char], sel: &Selectors) -> Option<Located> {
         }
     }
     if let Some((_, s, e)) = best {
-        return Some(Located { start: s, end: e, method: AnchorMethod::Fuzzy });
+        return Some(Located {
+            start: s,
+            end: e,
+            method: AnchorMethod::Fuzzy,
+        });
     }
 
     None

@@ -33,9 +33,11 @@ impl AppError {
                 "unauthorized",
                 "a valid bearer token is required".into(),
             ),
-            AppError::PayloadTooLarge(m) => {
-                (StatusCode::PAYLOAD_TOO_LARGE, "payload_too_large", m.clone())
-            }
+            AppError::PayloadTooLarge(m) => (
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "payload_too_large",
+                m.clone(),
+            ),
             AppError::Internal(e) => {
                 tracing::error!(error = ?e, "internal error");
                 (
@@ -62,7 +64,13 @@ struct ErrorDetail {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, code, message) = self.parts();
-        (status, Json(ErrorBody { error: ErrorDetail { code, message } })).into_response()
+        (
+            status,
+            Json(ErrorBody {
+                error: ErrorDetail { code, message },
+            }),
+        )
+            .into_response()
     }
 }
 

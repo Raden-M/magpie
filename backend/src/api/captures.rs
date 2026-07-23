@@ -11,7 +11,7 @@ use axum::response::IntoResponse;
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
-use crate::db::models::{NewHighlight, NewPage, NewSnapshot, Media};
+use crate::db::models::{Media, NewHighlight, NewPage, NewSnapshot};
 use crate::db::{highlights, media, pages, snapshots};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
@@ -210,16 +210,25 @@ fn validate(payload: &CapturePayload) -> AppResult<()> {
         return Err(AppError::bad_request("`page.title` is required"));
     }
     if payload.snapshot.content_html.len() > MAX_CONTENT_BYTES {
-        return Err(AppError::PayloadTooLarge("snapshot content is too large".into()));
+        return Err(AppError::PayloadTooLarge(
+            "snapshot content is too large".into(),
+        ));
     }
     if let Some(h) = &payload.highlight {
         if h.quote_exact.trim().is_empty() {
-            return Err(AppError::bad_request("a highlight must include `quote_exact`"));
+            return Err(AppError::bad_request(
+                "a highlight must include `quote_exact`",
+            ));
         }
         if h.quote_exact.chars().count() > MAX_QUOTE_CHARS {
-            return Err(AppError::PayloadTooLarge("highlight quote is too long".into()));
+            return Err(AppError::PayloadTooLarge(
+                "highlight quote is too long".into(),
+            ));
         }
-        if h.note.as_ref().is_some_and(|n| n.chars().count() > MAX_NOTE_CHARS) {
+        if h.note
+            .as_ref()
+            .is_some_and(|n| n.chars().count() > MAX_NOTE_CHARS)
+        {
             return Err(AppError::PayloadTooLarge("note is too long".into()));
         }
     }
@@ -309,7 +318,11 @@ fn commit_capture(
         }
 
         // Persist a favicon blob if it arrived and is new.
-        let favicon = payload.page.favicon_hash.as_ref().filter(|h| !h.trim().is_empty());
+        let favicon = payload
+            .page
+            .favicon_hash
+            .as_ref()
+            .filter(|h| !h.trim().is_empty());
         if let (Some(hash), Some(bytes)) = (favicon, favicon.and_then(|h| images.get(h))) {
             media::insert_media(
                 &tx,
@@ -348,7 +361,13 @@ fn commit_capture(
     tx.execute(
         "INSERT INTO capture_log(capture_id, page_id, snapshot_id, highlight_id, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![payload.capture_id, page.id, decision.snapshot.id, highlight_id, now_iso()],
+        params![
+            payload.capture_id,
+            page.id,
+            decision.snapshot.id,
+            highlight_id,
+            now_iso()
+        ],
     )?;
 
     let highlight_count = pages::highlight_count(&tx, &page.id)?;
@@ -410,7 +429,13 @@ fn build_response(conn: &Connection, existing: &ExistingCapture) -> AppResult<Ca
             title: page.title,
             highlight_count,
         },
-        snapshot: SnapshotResult { id: existing.snapshot_id.clone(), version },
-        highlight: existing.highlight_id.clone().map(|id| HighlightResult { id }),
+        snapshot: SnapshotResult {
+            id: existing.snapshot_id.clone(),
+            version,
+        },
+        highlight: existing
+            .highlight_id
+            .clone()
+            .map(|id| HighlightResult { id }),
     })
 }

@@ -38,18 +38,26 @@ pub async fn page(
 
     let body = render_results(&query, &groups);
     let markup = shell("Search", &query, body);
-    Ok(([(header::CONTENT_SECURITY_POLICY, PAGE_CSP)], Html(markup.into_string())).into_response())
+    Ok((
+        [(header::CONTENT_SECURITY_POLICY, PAGE_CSP)],
+        Html(markup.into_string()),
+    )
+        .into_response())
 }
 
 fn escape_html(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 /// Render an FTS snippet safely: escape everything, then re-allow only the
 /// `<b>`/`</b>` match markers the snippet function inserted.
 fn safe_snippet(s: &str) -> PreEscaped<String> {
     let escaped = escape_html(s);
-    let bolded = escaped.replace("&lt;b&gt;", "<b>").replace("&lt;/b&gt;", "</b>");
+    let bolded = escaped
+        .replace("&lt;b&gt;", "<b>")
+        .replace("&lt;/b&gt;", "</b>");
     PreEscaped(bolded)
 }
 

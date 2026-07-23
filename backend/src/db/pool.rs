@@ -30,22 +30,28 @@ impl Db {
         std::fs::create_dir_all(data_dir.join("media"))
             .with_context(|| format!("creating {}", data_dir.join("media").display()))?;
 
-        let manager = SqliteConnectionManager::file(data_dir.join("magpie.db"))
-            .with_init(|conn| {
-                conn.execute_batch(
-                    "PRAGMA journal_mode = WAL;
+        let manager = SqliteConnectionManager::file(data_dir.join("magpie.db")).with_init(|conn| {
+            conn.execute_batch(
+                "PRAGMA journal_mode = WAL;
                      PRAGMA foreign_keys = ON;
                      PRAGMA busy_timeout = 5000;
                      PRAGMA synchronous = NORMAL;",
-                )
-            });
-        let pool = Pool::builder().build(manager).context("building SQLite pool")?;
+            )
+        });
+        let pool = Pool::builder()
+            .build(manager)
+            .context("building SQLite pool")?;
 
         let mut conn = pool.get().context("checking out a connection")?;
-        super::migrations().to_latest(&mut conn).context("applying migrations")?;
+        super::migrations()
+            .to_latest(&mut conn)
+            .context("applying migrations")?;
         drop(conn);
 
-        Ok(Db { pool, data_dir: data_dir.to_path_buf() })
+        Ok(Db {
+            pool,
+            data_dir: data_dir.to_path_buf(),
+        })
     }
 
     pub fn data_dir(&self) -> &Path {

@@ -49,7 +49,10 @@ pub fn list_highlights(
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map(params_from_iter(vals), |row| {
         let highlight = Highlight::from_row(row)?;
-        Ok(HighlightListRow { cursor_value: highlight.created_at.clone(), highlight })
+        Ok(HighlightListRow {
+            cursor_value: highlight.created_at.clone(),
+            highlight,
+        })
     })?;
     rows.collect()
 }
@@ -81,8 +84,12 @@ pub fn insert_highlight(conn: &Connection, input: &NewHighlight) -> rusqlite::Re
 }
 
 pub fn get_highlight(conn: &Connection, id: &str) -> rusqlite::Result<Option<Highlight>> {
-    conn.query_row("SELECT * FROM highlight WHERE id = ?1", params![id], Highlight::from_row)
-        .optional()
+    conn.query_row(
+        "SELECT * FROM highlight WHERE id = ?1",
+        params![id],
+        Highlight::from_row,
+    )
+    .optional()
 }
 
 /// Highlights for a page, ordered by document position where anchored, else by

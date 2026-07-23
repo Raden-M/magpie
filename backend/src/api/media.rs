@@ -14,10 +14,7 @@ fn is_valid_hash(hash: &str) -> bool {
     hash.len() == 64 && hash.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
-pub async fn serve(
-    State(state): State<AppState>,
-    Path(hash): Path<String>,
-) -> AppResult<Response> {
+pub async fn serve(State(state): State<AppState>, Path(hash): Path<String>) -> AppResult<Response> {
     if !is_valid_hash(&hash) {
         return Err(AppError::not_found("no such media"));
     }
@@ -39,7 +36,10 @@ pub async fn serve(
         StatusCode::OK,
         [
             (header::CONTENT_TYPE, mime),
-            (header::CACHE_CONTROL, "public, max-age=31536000, immutable".to_string()),
+            (
+                header::CACHE_CONTROL,
+                "public, max-age=31536000, immutable".to_string(),
+            ),
         ],
         Body::from(bytes),
     )

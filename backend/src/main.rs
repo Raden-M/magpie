@@ -13,7 +13,10 @@ async fn main() -> anyhow::Result<()> {
     check_startup_safety(&config)?;
 
     let db = Db::open(&config.data_dir)?;
-    let state = AppState { db, config: Arc::new(config.clone()) };
+    let state = AppState {
+        db,
+        config: Arc::new(config.clone()),
+    };
 
     let listener = tokio::net::TcpListener::bind(config.bind).await?;
     tracing::info!(bind = %config.bind, data_dir = %config.data_dir.display(), "magpie listening");
@@ -32,11 +35,17 @@ fn check_startup_safety(config: &Config) -> anyhow::Result<()> {
     }
 
     std::fs::create_dir_all(&config.data_dir).map_err(|e| {
-        anyhow::anyhow!("data directory {} is not usable: {e}", config.data_dir.display())
+        anyhow::anyhow!(
+            "data directory {} is not usable: {e}",
+            config.data_dir.display()
+        )
     })?;
     let probe = config.data_dir.join(".magpie-write-test");
     std::fs::write(&probe, b"ok").map_err(|e| {
-        anyhow::anyhow!("data directory {} is not writable: {e}", config.data_dir.display())
+        anyhow::anyhow!(
+            "data directory {} is not writable: {e}",
+            config.data_dir.display()
+        )
     })?;
     let _ = std::fs::remove_file(&probe);
     Ok(())
@@ -46,5 +55,8 @@ fn init_tracing(level: &str) {
     use tracing_subscriber::EnvFilter;
     let filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new(format!("magpie={level},tower_http={level}")));
-    tracing_subscriber::fmt().with_env_filter(filter).with_target(false).init();
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_target(false)
+        .init();
 }

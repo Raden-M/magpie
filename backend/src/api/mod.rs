@@ -35,12 +35,18 @@ pub fn router(state: AppState) -> Router {
         .route("/api/pages/{id}/reader", get(web::reader::reader))
         .route("/api/pages/{id}/snapshot", get(web::reader::snapshot_raw))
         .route("/api/highlights", get(highlights::list))
-        .route("/api/highlights/{id}", patch(highlights::patch).delete(highlights::delete))
+        .route(
+            "/api/highlights/{id}",
+            patch(highlights::patch).delete(highlights::delete),
+        )
         .route("/api/search", get(search::search))
         .route("/api/stats", get(stats::get))
         .route("/search", get(web::search::page))
         .route("/media/{hash}", get(media::serve))
-        .layer(middleware::from_fn_with_state(state.clone(), auth::require_auth))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth::require_auth,
+        ))
         .layer(auth::cors_layer(&state.config.allowed_origins))
         .with_state(state)
 }

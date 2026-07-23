@@ -68,8 +68,10 @@ pub fn cors_layer(origins: &[String]) -> CorsLayer {
         .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE])
         .allow_headers([AUTHORIZATION, CONTENT_TYPE]);
 
-    let parsed: Vec<HeaderValue> =
-        origins.iter().filter_map(|o| o.trim().parse::<HeaderValue>().ok()).collect();
+    let parsed: Vec<HeaderValue> = origins
+        .iter()
+        .filter_map(|o| o.trim().parse::<HeaderValue>().ok())
+        .collect();
 
     if parsed.is_empty() {
         layer

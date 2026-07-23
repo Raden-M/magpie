@@ -43,7 +43,12 @@ async fn load(state: &AppState, id: String, version: Option<i64>) -> AppResult<L
             let highlights = highlights::highlights_for_page(conn, &page.id)?;
             let content_html = std::fs::read_to_string(data_dir.join(&snapshot.content_path))
                 .map_err(|e| AppError::Internal(e.into()))?;
-            Ok(Loaded { page, snapshot, highlights, content_html })
+            Ok(Loaded {
+                page,
+                snapshot,
+                highlights,
+                content_html,
+            })
         })
         .await
 }
@@ -104,8 +109,17 @@ fn snippet(quote: &str) -> String {
     out
 }
 
-fn render_reader(loaded: &Loaded, baked_html: &str, located: &std::collections::HashSet<String>) -> Markup {
-    let Loaded { page, snapshot, highlights, .. } = loaded;
+fn render_reader(
+    loaded: &Loaded,
+    baked_html: &str,
+    located: &std::collections::HashSet<String>,
+) -> Markup {
+    let Loaded {
+        page,
+        snapshot,
+        highlights,
+        ..
+    } = loaded;
     let reading = snapshot.reading_time.unwrap_or(0);
 
     html! {

@@ -41,9 +41,8 @@ fn is_ws(ch: char) -> bool {
 /// characters (including whitespace, handled separately) pass through.
 fn fold(ch: char) -> char {
     match ch {
-        '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}' | '\u{2032}' | '\u{0060}' | '\u{00B4}' => {
-            '\''
-        }
+        '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}' | '\u{2032}' | '\u{0060}'
+        | '\u{00B4}' => '\'',
         '\u{201C}' | '\u{201D}' | '\u{201E}' | '\u{201F}' | '\u{2033}' => '"',
         '\u{2010}' | '\u{2011}' | '\u{2012}' | '\u{2013}' | '\u{2014}' | '\u{2015}'
         | '\u{2212}' => '-',
@@ -63,7 +62,10 @@ pub fn normalize_pieces(pieces: &[&str]) -> Normalized {
                 // Remember the first whitespace of a run as the source of the
                 // single space we will emit - but never emit a leading space.
                 if !text.is_empty() && pending_ws.is_none() {
-                    pending_ws = Some(CharSource { piece: pi, offset: ci });
+                    pending_ws = Some(CharSource {
+                        piece: pi,
+                        offset: ci,
+                    });
                 }
                 continue;
             }
@@ -72,7 +74,10 @@ pub fn normalize_pieces(pieces: &[&str]) -> Normalized {
                 map.push(src);
             }
             text.push(fold(ch));
-            map.push(CharSource { piece: pi, offset: ci });
+            map.push(CharSource {
+                piece: pi,
+                offset: ci,
+            });
         }
     }
     // A trailing whitespace run is simply dropped (trim).
@@ -110,7 +115,13 @@ mod tests {
         assert_eq!(n.text, "foo bar");
         // The 'b' maps to piece 1, offset 0.
         let b_index = n.text.chars().position(|c| c == 'b').unwrap();
-        assert_eq!(n.map[b_index], CharSource { piece: 1, offset: 0 });
+        assert_eq!(
+            n.map[b_index],
+            CharSource {
+                piece: 1,
+                offset: 0
+            }
+        );
     }
 
     #[test]
@@ -119,6 +130,12 @@ mod tests {
         assert_eq!(n.text, "Hello world");
         // 'w' is raw offset 7 (after "Hello" + two spaces).
         let w_index = n.text.chars().position(|c| c == 'w').unwrap();
-        assert_eq!(n.map[w_index], CharSource { piece: 0, offset: 7 });
+        assert_eq!(
+            n.map[w_index],
+            CharSource {
+                piece: 0,
+                offset: 7
+            }
+        );
     }
 }

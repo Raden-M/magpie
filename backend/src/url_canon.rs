@@ -14,8 +14,7 @@ const TRACKING_PREFIX: &[&str] = &["utm_", "mc_", "mkt_", "pk_", "piwik_", "hsa_
 
 fn is_tracking_param(key: &str) -> bool {
     let key = key.to_ascii_lowercase();
-    TRACKING_EXACT.contains(&key.as_str())
-        || TRACKING_PREFIX.iter().any(|p| key.starts_with(p))
+    TRACKING_EXACT.contains(&key.as_str()) || TRACKING_PREFIX.iter().any(|p| key.starts_with(p))
 }
 
 /// Normalize a URL for use as a grouping key. Lowercases scheme+host (the `url`
@@ -68,7 +67,10 @@ pub fn canonicalize(input: &str) -> Option<String> {
 
 /// The host of a URL, for the "never merge across origins" check.
 pub fn host_of(input: &str) -> Option<String> {
-    Url::parse(input.trim()).ok()?.host_str().map(|h| h.to_ascii_lowercase())
+    Url::parse(input.trim())
+        .ok()?
+        .host_str()
+        .map(|h| h.to_ascii_lowercase())
 }
 
 #[cfg(test)]
@@ -83,8 +85,14 @@ mod tests {
 
     #[test]
     fn drops_default_port_and_trailing_slash() {
-        assert_eq!(canonicalize("https://example.com:443/").unwrap(), "https://example.com/");
-        assert_eq!(canonicalize("http://example.com/x/").unwrap(), "http://example.com/x");
+        assert_eq!(
+            canonicalize("https://example.com:443/").unwrap(),
+            "https://example.com/"
+        );
+        assert_eq!(
+            canonicalize("http://example.com/x/").unwrap(),
+            "http://example.com/x"
+        );
     }
 
     #[test]

@@ -48,12 +48,9 @@ pub fn list_pages(conn: &Connection, query: &PageListQuery) -> rusqlite::Result<
 
     if let Some((value, id)) = &query.after {
         match query.sort {
-            PageSort::Recent => {
-                sql.push_str(" AND (p.last_captured_at < ? OR (p.last_captured_at = ? AND p.id < ?))")
-            }
-            PageSort::Title => {
-                sql.push_str(" AND (p.title > ? OR (p.title = ? AND p.id > ?))")
-            }
+            PageSort::Recent => sql
+                .push_str(" AND (p.last_captured_at < ? OR (p.last_captured_at = ? AND p.id < ?))"),
+            PageSort::Title => sql.push_str(" AND (p.title > ? OR (p.title = ? AND p.id > ?))"),
         }
         vals.push(Value::Text(value.clone()));
         vals.push(Value::Text(value.clone()));
@@ -117,8 +114,12 @@ pub fn upsert_page(conn: &Connection, input: &NewPage) -> rusqlite::Result<Page>
 }
 
 pub fn get_page(conn: &Connection, id: &str) -> rusqlite::Result<Option<Page>> {
-    conn.query_row("SELECT * FROM page WHERE id = ?1", params![id], Page::from_row)
-        .optional()
+    conn.query_row(
+        "SELECT * FROM page WHERE id = ?1",
+        params![id],
+        Page::from_row,
+    )
+    .optional()
 }
 
 /// Number of highlights currently attached to a page.
