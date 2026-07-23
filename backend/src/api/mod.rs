@@ -1,6 +1,7 @@
 //! HTTP API surface. Each submodule owns a slice of routes; [`router`] wires
 //! them together with the shared [`AppState`].
 
+pub mod auth;
 pub mod captures;
 pub mod dto;
 pub mod highlights;
@@ -11,6 +12,7 @@ pub mod stats;
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
+use axum::middleware;
 use axum::routing::{get, patch, post};
 
 use crate::state::AppState;
@@ -38,5 +40,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/stats", get(stats::get))
         .route("/search", get(web::search::page))
         .route("/media/{hash}", get(media::serve))
+        .layer(middleware::from_fn_with_state(state.clone(), auth::require_auth))
+        .layer(auth::cors_layer(&state.config.allowed_origins))
         .with_state(state)
 }

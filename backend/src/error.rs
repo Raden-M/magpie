@@ -12,7 +12,6 @@ pub enum AppError {
     BadRequest(String),
     Unauthorized,
     PayloadTooLarge(String),
-    Conflict(String),
     Internal(anyhow::Error),
 }
 
@@ -37,7 +36,6 @@ impl AppError {
             AppError::PayloadTooLarge(m) => {
                 (StatusCode::PAYLOAD_TOO_LARGE, "payload_too_large", m.clone())
             }
-            AppError::Conflict(m) => (StatusCode::CONFLICT, "conflict", m.clone()),
             AppError::Internal(e) => {
                 tracing::error!(error = ?e, "internal error");
                 (

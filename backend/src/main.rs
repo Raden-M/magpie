@@ -23,6 +23,7 @@ use crate::state::AppState;
 async fn main() -> anyhow::Result<()> {
     let config = Config::parse();
     init_tracing(&config.log);
+    check_startup_safety(&config)?;
 
     let db = Db::open(&config.data_dir)?;
     let state = AppState { db, config: Arc::new(config.clone()) };
@@ -39,6 +40,27 @@ async fn main() -> anyhow::Result<()> {
 
 async fn healthz() -> &'static str {
     "ok"
+}
+
+/// Fail fast on foot-guns before opening the database (docs/08-deployment.md).
+fn check_startup_safety(config: &Config) -> anyhow::Result<()> {
+    if !config.is_loopback() && config.token.is_none() {
+        anyhow::bail!(
+            "refusing to bind to non-loopback address {} without MAGPIE_TOKEN set - \
+             a token is required whenever Magpie is reachable off this machine",
+            config.bind
+        );
+    }
+
+    std::fs::create_dir_all(&config.data_dir).map_err(|e| {
+        anyhow::anyhow!("data directory {} is not usable: {e}", config.data_dir.display())
+    })?;
+    let probe = config.data_dir.join(".magpie-write-test");
+    std::fs::write(&probe, b"ok").map_err(|e| {
+        anyhow::anyhow!("data directory {} is not writable: {e}", config.data_dir.display())
+    })?;
+    let _ = std::fs::remove_file(&probe);
+    Ok(())
 }
 
 fn init_tracing(level: &str) {
