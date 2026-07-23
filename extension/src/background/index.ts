@@ -5,31 +5,32 @@
 
 import { base64ToBlob } from "../shared/bytes.js";
 import { getSettings } from "../shared/config.js";
+import { ext } from "../shared/ext.js";
 import { CaptureError, postCapture } from "../shared/http.js";
 import { CAPTURE_MESSAGE, TRIGGER_CAPTURE } from "../shared/messages.js";
 import type { CaptureRequestMessage, CaptureResultMessage } from "../shared/messages.js";
 
 const CONTEXT_MENU_ID = "magpie-keep-selection";
 
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
+ext.runtime.onInstalled.addListener(() => {
+  ext.contextMenus.create({
     id: CONTEXT_MENU_ID,
     title: "Keep selection in Magpie",
     contexts: ["selection"],
   });
 });
 
-chrome.contextMenus.onClicked.addListener((info, tab) => {
+ext.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === CONTEXT_MENU_ID && tab?.id !== undefined) {
-    void chrome.tabs.sendMessage(tab.id, { type: TRIGGER_CAPTURE });
+    void ext.tabs.sendMessage(tab.id, { type: TRIGGER_CAPTURE });
   }
 });
 
-chrome.commands.onCommand.addListener(async (command) => {
+ext.commands.onCommand.addListener(async (command) => {
   if (command !== "keep-selection") return;
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [tab] = await ext.tabs.query({ active: true, currentWindow: true });
   if (tab?.id !== undefined) {
-    void chrome.tabs.sendMessage(tab.id, { type: TRIGGER_CAPTURE });
+    void ext.tabs.sendMessage(tab.id, { type: TRIGGER_CAPTURE });
   }
 });
 
@@ -51,7 +52,7 @@ async function handleCapture(msg: CaptureRequestMessage): Promise<CaptureResultM
   }
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+ext.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message && message.type === CAPTURE_MESSAGE) {
     handleCapture(message as CaptureRequestMessage).then(sendResponse);
     return true; // keep the channel open for the async response

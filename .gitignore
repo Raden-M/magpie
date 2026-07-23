@@ -6,10 +6,12 @@ backend/target/
 # Extension / tooling
 node_modules/
 dist/
+dist-firefox/
 *.tsbuildinfo
 
 # Runtime data (never commit a user's hoard)
 /data
+backend/data/
 *.db
 *.db-wal
 *.db-shm

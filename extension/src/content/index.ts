@@ -3,6 +3,7 @@
 // and handing it to the service worker.
 
 import { getSettings } from "../shared/config.js";
+import { ext } from "../shared/ext.js";
 import { TRIGGER_CAPTURE } from "../shared/messages.js";
 import type { CaptureResultMessage } from "../shared/messages.js";
 import type { Settings } from "../shared/types.js";
@@ -17,7 +18,7 @@ let capturing = false;
 const ui = createUi(onKeep);
 
 void getSettings().then((s) => (settings = s));
-chrome.storage.onChanged.addListener(() => {
+ext.storage.onChanged.addListener(() => {
   void getSettings().then((s) => (settings = s));
 });
 
@@ -52,7 +53,7 @@ async function onKeep(color: string, note: string | null): Promise<void> {
       note,
       maxImageBytes: 5_000_000,
     });
-    const result = (await chrome.runtime.sendMessage(message)) as CaptureResultMessage;
+    const result = (await ext.runtime.sendMessage(message)) as CaptureResultMessage;
     if (result.ok) {
       const n = result.response.page.highlight_count;
       const noun = n === 1 ? "shiny thing" : "shiny things";
@@ -72,7 +73,7 @@ async function onKeep(color: string, note: string | null): Promise<void> {
   }
 }
 
-chrome.runtime.onMessage.addListener((message) => {
+ext.runtime.onMessage.addListener((message) => {
   if (message && message.type === TRIGGER_CAPTURE) {
     void onKeep(settings?.defaultShade ?? "iridescent", null);
   }
