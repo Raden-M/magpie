@@ -103,21 +103,18 @@ CREATE TRIGGER highlight_au AFTER UPDATE ON highlight BEGIN
   VALUES (new.rowid, new.quote_exact, new.note);
 END;
 
--- Full-text search over snapshot plain text. Contentless: the tokenized text is
--- indexed here for search, the served HTML lives on disk, and the plain text is
--- not otherwise retained. contentless_delete lets us drop a row by rowid when a
--- snapshot is deleted, without the original text.
+-- Full-text search over snapshot plain text. A regular (self-contained) FTS5
+-- table: it stores the tokenized plain text so search can return highlighted
+-- snippets. The rendered HTML still lives on disk; this holds only extracted
+-- text for search. Rows are keyed by the snapshot's rowid.
 CREATE VIRTUAL TABLE snapshot_fts USING fts5(
   content_text,
   title,
-  content='',
-  contentless_delete=1,
   tokenize = 'unicode61 remove_diacritics 2'
 );
 
--- content_text is transient (not a column on snapshot), so inserts into
--- snapshot_fts happen in application code at capture time. Deletion, however,
--- is purely by rowid and safe to drive from a trigger.
+-- content_text is not a column on `snapshot`, so inserts into snapshot_fts
+-- happen in application code at capture time. Deletion is by rowid, driven here.
 CREATE TRIGGER snapshot_ad AFTER DELETE ON snapshot BEGIN
   DELETE FROM snapshot_fts WHERE rowid = old.rowid;
 END;

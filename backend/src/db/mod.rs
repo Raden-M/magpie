@@ -6,6 +6,7 @@ pub mod media;
 pub mod models;
 pub mod pages;
 pub mod pool;
+pub mod search;
 pub mod snapshots;
 pub mod stats;
 

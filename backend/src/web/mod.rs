@@ -3,10 +3,12 @@
 //! scroll-spy "shiny things" rail.
 
 pub mod reader;
+pub mod search;
 
-/// CSP for the full reader page: our own styles/scripts/images only, and never
-/// any script the stored snapshot might carry (no `'unsafe-inline'` for scripts).
-pub const READER_CSP: &str = "default-src 'none'; img-src 'self' data:; \
+/// CSP for server-rendered UI pages (collection, reader, search): our own
+/// styles/scripts/images only, and never any script a stored snapshot might
+/// carry (no `'unsafe-inline'` for scripts).
+pub const PAGE_CSP: &str = "default-src 'none'; img-src 'self' data:; \
      style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; \
      base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 

@@ -6,6 +6,7 @@ pub mod dto;
 pub mod highlights;
 pub mod media;
 pub mod pages;
+pub mod search;
 pub mod stats;
 
 use axum::Router;
@@ -30,7 +31,9 @@ pub fn router(state: AppState) -> Router {
         .route("/api/pages/{id}/snapshot", get(web::reader::snapshot_raw))
         .route("/api/highlights", get(highlights::list))
         .route("/api/highlights/{id}", patch(highlights::patch).delete(highlights::delete))
+        .route("/api/search", get(search::search))
         .route("/api/stats", get(stats::get))
+        .route("/search", get(web::search::page))
         .route("/media/{hash}", get(media::serve))
         .with_state(state)
 }

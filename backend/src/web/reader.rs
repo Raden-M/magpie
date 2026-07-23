@@ -13,7 +13,7 @@ use crate::error::{AppError, AppResult};
 use crate::reader::anchor::Selectors;
 use crate::reader::bake::{self, BakeHighlight};
 use crate::state::AppState;
-use crate::web::{READER_CSP, SNAPSHOT_CSP};
+use crate::web::{PAGE_CSP, SNAPSHOT_CSP};
 
 #[derive(Debug, Deserialize)]
 pub struct ReaderParams {
@@ -74,7 +74,7 @@ pub async fn reader(
 
     let markup = render_reader(&loaded, &baked.html, &baked.located);
     Ok((
-        [(header::CONTENT_SECURITY_POLICY, READER_CSP)],
+        [(header::CONTENT_SECURITY_POLICY, PAGE_CSP)],
         Html(markup.into_string()),
     )
         .into_response())
