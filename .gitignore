@@ -1,0 +1,30 @@
+# Rust backend
+/target
+backend/target/
+**/*.rs.bk
+
+# Extension / tooling
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Runtime data (never commit a user's hoard)
+/data
+*.db
+*.db-wal
+*.db-shm
+
+# Env / secrets
+.env
+.env.*
+magpie.toml
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Private specification & planning — NOT for the open-source release.
+# Kept local only; a separate public README/docs will be written before publishing.
+/.planning/

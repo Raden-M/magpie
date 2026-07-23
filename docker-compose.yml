@@ -1,0 +1,19 @@
+services:
+  magpie:
+    build:
+      context: ./backend
+    image: magpie:latest
+    restart: unless-stopped
+    environment:
+      MAGPIE_BIND: 0.0.0.0:8787
+      MAGPIE_DATA_DIR: /data
+      # Required when bound to a non-loopback address:
+      MAGPIE_TOKEN: ${MAGPIE_TOKEN:?set MAGPIE_TOKEN in a .env file}
+      # Your installed extension's origin, e.g. chrome-extension://<id>
+      MAGPIE_ALLOWED_ORIGINS: ${MAGPIE_ALLOWED_ORIGINS:-}
+      MAGPIE_LOG: info
+    volumes:
+      - ./data:/data
+    # Expose only to your reverse proxy / private network, not the public internet.
+    ports:
+      - "127.0.0.1:8787:8787"
