@@ -3,7 +3,7 @@
 //! media + FTS in a single transaction, keyed for idempotent retries.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::Path;
 
 use axum::extract::{Multipart, State};
 use axum::http::StatusCode;
@@ -228,7 +228,7 @@ fn validate(payload: &CapturePayload) -> AppResult<()> {
 
 fn commit_capture(
     conn: &mut Connection,
-    data_dir: &PathBuf,
+    data_dir: &Path,
     payload: CapturePayload,
     canonical_url: String,
     original_url: String,
@@ -309,19 +309,18 @@ fn commit_capture(
         }
 
         // Persist a favicon blob if it arrived and is new.
-        if let Some(hash) = payload.page.favicon_hash.as_ref().filter(|h| !h.trim().is_empty()) {
-            if let Some(bytes) = images.get(hash) {
-                media::insert_media(
-                    &tx,
-                    &Media {
-                        hash: hash.clone(),
-                        mime: "image/x-icon".into(),
-                        byte_size: bytes.len() as i64,
-                        created_at: String::new(),
-                    },
-                )?;
-                std::fs::write(data_dir.join("media").join(hash), bytes)?;
-            }
+        let favicon = payload.page.favicon_hash.as_ref().filter(|h| !h.trim().is_empty());
+        if let (Some(hash), Some(bytes)) = (favicon, favicon.and_then(|h| images.get(h))) {
+            media::insert_media(
+                &tx,
+                &Media {
+                    hash: hash.clone(),
+                    mime: "image/x-icon".into(),
+                    byte_size: bytes.len() as i64,
+                    created_at: String::new(),
+                },
+            )?;
+            std::fs::write(data_dir.join("media").join(hash), bytes)?;
         }
     }
 

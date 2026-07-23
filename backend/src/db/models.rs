@@ -36,6 +36,9 @@ impl Page {
 #[derive(Debug, Clone)]
 pub struct Snapshot {
     pub id: String,
+    // Mirrors the row; not read directly today (snapshots are always fetched by
+    // page), but part of the model's fidelity to the schema.
+    #[allow(dead_code)]
     pub page_id: String,
     pub version: i64,
     pub content_path: String,
@@ -108,6 +111,8 @@ pub struct Media {
     pub hash: String,
     pub mime: String,
     pub byte_size: i64,
+    // Mirrors the row; retained for schema fidelity though not read today.
+    #[allow(dead_code)]
     pub created_at: String,
 }
 

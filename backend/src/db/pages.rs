@@ -121,11 +121,6 @@ pub fn get_page(conn: &Connection, id: &str) -> rusqlite::Result<Option<Page>> {
         .optional()
 }
 
-pub fn touch_last_captured(conn: &Connection, id: &str, when: &str) -> rusqlite::Result<()> {
-    conn.execute("UPDATE page SET last_captured_at = ?2 WHERE id = ?1", params![id, when])?;
-    Ok(())
-}
-
 /// Number of highlights currently attached to a page.
 pub fn highlight_count(conn: &Connection, page_id: &str) -> rusqlite::Result<i64> {
     conn.query_row(

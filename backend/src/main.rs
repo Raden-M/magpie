@@ -3,9 +3,11 @@ mod config;
 mod cursor;
 mod db;
 mod error;
+mod reader;
 mod state;
 mod url_canon;
 mod util;
+mod web;
 
 use std::sync::Arc;
 

@@ -917,6 +917,7 @@ dependencies = [
  "base64",
  "bytes",
  "clap",
+ "html5ever",
  "kuchikiki",
  "maud",
  "r2d2",

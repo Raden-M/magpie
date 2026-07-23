@@ -50,10 +50,10 @@ pub fn store_or_reuse(
     content_path_for: impl Fn(&str) -> String,
     input: &NewSnapshot,
 ) -> rusqlite::Result<SnapshotDecision> {
-    if let Some(latest) = latest_snapshot(conn, page_id)? {
-        if latest.content_hash == input.content_hash {
-            return Ok(SnapshotDecision { snapshot: latest, created: false });
-        }
+    if let Some(latest) = latest_snapshot(conn, page_id)?
+        && latest.content_hash == input.content_hash
+    {
+        return Ok(SnapshotDecision { snapshot: latest, created: false });
     }
 
     let previous_version: Option<i64> = conn.query_row(

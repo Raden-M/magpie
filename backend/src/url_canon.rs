@@ -56,11 +56,11 @@ pub fn canonicalize(input: &str) -> Option<String> {
     }
 
     // Remove a trailing slash on non-root paths.
-    if url.path().len() > 1 {
-        if let Some(trimmed) = url.path().strip_suffix('/') {
-            let trimmed = trimmed.to_string();
-            url.set_path(&trimmed);
-        }
+    if url.path().len() > 1
+        && let Some(trimmed) = url.path().strip_suffix('/')
+    {
+        let trimmed = trimmed.to_string();
+        url.set_path(&trimmed);
     }
 
     Some(url.into())

@@ -52,10 +52,6 @@ impl Db {
         &self.data_dir
     }
 
-    pub fn snapshot_path(&self, snapshot_id: &str) -> PathBuf {
-        self.data_dir.join("snapshots").join(format!("{snapshot_id}.html"))
-    }
-
     pub fn media_path(&self, hash: &str) -> PathBuf {
         self.data_dir.join("media").join(hash)
     }
