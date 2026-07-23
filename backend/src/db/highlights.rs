@@ -1,10 +1,58 @@
 //! Highlight CRUD. User data (note, colour) is editable; anchoring selectors
 //! are immutable once captured.
 
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::types::Value;
+use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 
 use crate::db::models::{Highlight, NewHighlight};
 use crate::util::{new_id, now_iso};
+
+pub struct HighlightListQuery {
+    pub page_id: Option<String>,
+    pub q: Option<String>,
+    pub limit: usize,
+    pub after: Option<(String, String)>,
+}
+
+/// One highlight plus its sort key for cursor building.
+pub struct HighlightListRow {
+    pub highlight: Highlight,
+    pub cursor_value: String,
+}
+
+/// Cross-page highlight listing, newest first, keyset-paginated.
+pub fn list_highlights(
+    conn: &Connection,
+    query: &HighlightListQuery,
+) -> rusqlite::Result<Vec<HighlightListRow>> {
+    let mut sql = String::from("SELECT * FROM highlight WHERE 1 = 1");
+    let mut vals: Vec<Value> = Vec::new();
+
+    if let Some(page_id) = &query.page_id {
+        sql.push_str(" AND page_id = ?");
+        vals.push(Value::Text(page_id.clone()));
+    }
+    if let Some(q) = query.q.as_ref().filter(|q| !q.trim().is_empty()) {
+        sql.push_str(" AND (quote_exact LIKE ? OR note LIKE ?)");
+        vals.push(Value::Text(format!("%{q}%")));
+        vals.push(Value::Text(format!("%{q}%")));
+    }
+    if let Some((value, id)) = &query.after {
+        sql.push_str(" AND (created_at < ? OR (created_at = ? AND id < ?))");
+        vals.push(Value::Text(value.clone()));
+        vals.push(Value::Text(value.clone()));
+        vals.push(Value::Text(id.clone()));
+    }
+    sql.push_str(" ORDER BY created_at DESC, id DESC LIMIT ?");
+    vals.push(Value::Integer(query.limit as i64));
+
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(params_from_iter(vals), |row| {
+        let highlight = Highlight::from_row(row)?;
+        Ok(HighlightListRow { cursor_value: highlight.created_at.clone(), highlight })
+    })?;
+    rows.collect()
+}
 
 pub fn insert_highlight(conn: &Connection, input: &NewHighlight) -> rusqlite::Result<Highlight> {
     let id = new_id();

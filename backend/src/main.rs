@@ -1,5 +1,6 @@
 mod api;
 mod config;
+mod cursor;
 mod db;
 mod error;
 mod state;

@@ -7,6 +7,7 @@ pub mod models;
 pub mod pages;
 pub mod pool;
 pub mod snapshots;
+pub mod stats;
 
 pub use pool::Db;
 

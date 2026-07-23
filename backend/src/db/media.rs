@@ -1,6 +1,8 @@
 //! Content-addressed media. Blobs live on disk under `<data_dir>/media/<hash>`;
 //! this table records metadata and drives dedupe and orphan collection.
 
+use std::path::Path;
+
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::db::models::Media;
@@ -57,4 +59,15 @@ pub fn orphan_hashes(conn: &Connection) -> rusqlite::Result<Vec<String>> {
 pub fn delete_media_row(conn: &Connection, hash: &str) -> rusqlite::Result<()> {
     conn.execute("DELETE FROM media WHERE hash = ?1", params![hash])?;
     Ok(())
+}
+
+/// Delete every orphaned media row and its on-disk blob. File removal is
+/// best-effort (a missing file is not an error). Returns how many were collected.
+pub fn collect_orphans(conn: &Connection, media_dir: &Path) -> rusqlite::Result<usize> {
+    let orphans = orphan_hashes(conn)?;
+    for hash in &orphans {
+        let _ = std::fs::remove_file(media_dir.join(hash));
+        delete_media_row(conn, hash)?;
+    }
+    Ok(orphans.len())
 }
