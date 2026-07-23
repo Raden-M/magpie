@@ -1,0 +1,5 @@
+# Keep the build context small and the cargo-chef cache honest.
+target/
+**/*.rs.bk
+Dockerfile
+.dockerignore
