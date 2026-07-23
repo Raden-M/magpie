@@ -2,6 +2,9 @@
 //! search pages. The reader is the centrepiece - a serif column with a
 //! scroll-spy "shiny things" rail.
 
+pub mod assets;
+pub mod collection;
+pub mod layout;
 pub mod reader;
 pub mod search;
 

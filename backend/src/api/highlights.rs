@@ -3,7 +3,7 @@
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::api::dto::HighlightJson;
 use crate::api::pages::clamp_limit;
@@ -64,10 +64,19 @@ pub async fn list(
 #[derive(Debug, Deserialize)]
 pub struct PatchBody {
     /// Absent = leave note unchanged; `null` = clear it; a string = set it.
-    #[serde(default)]
+    /// The double-option deserializer is what distinguishes absent from null:
+    /// plain `Option<Option<T>>` maps JSON `null` to the outer `None`.
+    #[serde(default, deserialize_with = "double_option")]
     pub note: Option<Option<String>>,
     #[serde(default)]
     pub color: Option<String>,
+}
+
+fn double_option<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(Some(Option::deserialize(deserializer)?))
 }
 
 pub async fn patch(

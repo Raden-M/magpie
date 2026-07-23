@@ -21,6 +21,9 @@ const CAPTURE_BODY_LIMIT: usize = 64 * 1024 * 1024;
 
 pub fn router(state: AppState) -> Router {
     Router::new()
+        .route("/", get(web::collection::page))
+        .route("/assets/app.css", get(web::assets::app_css))
+        .route("/assets/reader.js", get(web::assets::reader_js))
         .route(
             "/api/captures",
             post(captures::create_capture).layer(DefaultBodyLimit::max(CAPTURE_BODY_LIMIT)),

@@ -4,13 +4,14 @@
 use axum::extract::{Query, State};
 use axum::http::header;
 use axum::response::{Html, IntoResponse, Response};
-use maud::{DOCTYPE, Markup, PreEscaped, html};
+use maud::{Markup, PreEscaped, html};
 use serde::Deserialize;
 
 use crate::db::search::{self, HitKind, PageGroup};
 use crate::error::AppResult;
 use crate::state::AppState;
 use crate::web::PAGE_CSP;
+use crate::web::layout::shell;
 
 const MAX_GROUPS: usize = 50;
 const HITS_PER_PAGE: usize = 6;
@@ -35,7 +36,8 @@ pub async fn page(
         None => Vec::new(),
     };
 
-    let markup = render(&query, &groups);
+    let body = render_results(&query, &groups);
+    let markup = shell("Search", &query, body);
     Ok(([(header::CONTENT_SECURITY_POLICY, PAGE_CSP)], Html(markup.into_string())).into_response())
 }
 
@@ -51,52 +53,34 @@ fn safe_snippet(s: &str) -> PreEscaped<String> {
     PreEscaped(bolded)
 }
 
-fn render(query: &str, groups: &[PageGroup]) -> Markup {
+fn render_results(query: &str, groups: &[PageGroup]) -> Markup {
     html! {
-        (DOCTYPE)
-        html lang="en" {
-            head {
-                meta charset="utf-8";
-                meta name="viewport" content="width=device-width, initial-scale=1";
-                title { "Search · Magpie" }
-                link rel="stylesheet" href="/assets/app.css";
-            }
-            body class="ui-body" {
-                header class="topbar" {
-                    a class="brand" href="/" { "Mag" span class="brand-pie" { "pie" } }
-                    form class="search-form" method="get" action="/search" {
-                        input class="search-input" type="search" name="q" value=(query)
-                              placeholder="Search everything you kept" autofocus;
-                    }
+        main class="ui-main" {
+            @if query.trim().is_empty() {
+                p class="ui-empty" { "Type to search across your highlights, notes, and every word you kept." }
+            } @else if groups.is_empty() {
+                p class="ui-empty" { "Nothing matched \u{201c}" (query) "\u{201d}." }
+            } @else {
+                p class="search-summary" {
+                    (groups.len().min(MAX_GROUPS)) " page" (if groups.len() == 1 { "" } else { "s" })
                 }
-                main class="ui-main" {
-                    @if query.trim().is_empty() {
-                        p class="ui-empty" { "Type to search across your highlights, notes, and every word you kept." }
-                    } @else if groups.is_empty() {
-                        p class="ui-empty" { "Nothing matched \u{201c}" (query) "\u{201d}." }
-                    } @else {
-                        p class="search-summary" {
-                            (groups.len().min(MAX_GROUPS)) " page" (if groups.len() == 1 { "" } else { "s" })
-                        }
-                        ul class="search-results" {
-                            @for group in groups.iter().take(MAX_GROUPS) {
-                                li class="search-group" {
-                                    a class="search-page-title" href=(format!("/api/pages/{}/reader", group.page_id)) {
-                                        (group.page_title)
-                                    }
-                                    ul class="search-hits" {
-                                        @for hit in group.hits.iter().take(HITS_PER_PAGE) {
-                                            @let href = match hit.kind {
-                                                HitKind::Highlight => format!("/api/pages/{}/reader#hl-{}", group.page_id, hit.id),
-                                                HitKind::Content => format!("/api/pages/{}/reader", group.page_id),
-                                            };
-                                            li class="search-hit" {
-                                                span class=({ match hit.kind { HitKind::Highlight => "hit-kind hit-highlight", HitKind::Content => "hit-kind hit-content" } }) {
-                                                    (match hit.kind { HitKind::Highlight => "highlight", HitKind::Content => "in text" })
-                                                }
-                                                a class="hit-snippet" href=(href) { (safe_snippet(&hit.snippet)) }
-                                            }
+                ul class="search-results" {
+                    @for group in groups.iter().take(MAX_GROUPS) {
+                        li class="search-group" {
+                            a class="search-page-title" href=(format!("/api/pages/{}/reader", group.page_id)) {
+                                (group.page_title)
+                            }
+                            ul class="search-hits" {
+                                @for hit in group.hits.iter().take(HITS_PER_PAGE) {
+                                    @let href = match hit.kind {
+                                        HitKind::Highlight => format!("/api/pages/{}/reader#hl-{}", group.page_id, hit.id),
+                                        HitKind::Content => format!("/api/pages/{}/reader", group.page_id),
+                                    };
+                                    li class="search-hit" {
+                                        span class=({ match hit.kind { HitKind::Highlight => "hit-kind hit-highlight", HitKind::Content => "hit-kind hit-content" } }) {
+                                            (match hit.kind { HitKind::Highlight => "highlight", HitKind::Content => "in text" })
                                         }
+                                        a class="hit-snippet" href=(href) { (safe_snippet(&hit.snippet)) }
                                     }
                                 }
                             }
