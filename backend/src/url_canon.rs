@@ -73,6 +73,25 @@ pub fn host_of(input: &str) -> Option<String> {
         .map(|h| h.to_ascii_lowercase())
 }
 
+/// Split a URL into its authority (host, plus a non-default port) and the
+/// path-and-query remainder - the two halves the reader's source card stacks on
+/// separate lines. Splitting on the parse rather than on the string keeps a port
+/// with the host it belongs to.
+pub fn split_authority(input: &str) -> Option<(String, String)> {
+    let url = Url::parse(input.trim()).ok()?;
+    let host = url.host_str()?.to_ascii_lowercase();
+    let authority = match url.port() {
+        Some(port) => format!("{host}:{port}"),
+        None => host,
+    };
+    let mut rest = url.path().to_string();
+    if let Some(query) = url.query() {
+        rest.push('?');
+        rest.push_str(query);
+    }
+    Some((authority, rest))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -99,6 +118,23 @@ mod tests {
     fn rejects_non_http() {
         assert!(canonicalize("javascript:alert(1)").is_none());
         assert!(canonicalize("ftp://example.com/f").is_none());
+    }
+
+    #[test]
+    fn splits_authority_keeping_the_port_with_the_host() {
+        assert_eq!(
+            split_authority("https://en.wikipedia.org/wiki/Dog"),
+            Some(("en.wikipedia.org".into(), "/wiki/Dog".into()))
+        );
+        assert_eq!(
+            split_authority("http://localhost:8080/a?b=1"),
+            Some(("localhost:8080".into(), "/a?b=1".into()))
+        );
+        assert_eq!(
+            split_authority("https://example.com"),
+            Some(("example.com".into(), "/".into()))
+        );
+        assert_eq!(split_authority("not a url"), None);
     }
 
     #[test]
