@@ -363,3 +363,86 @@ async fn ui_csp_allows_collection_search() {
         );
     }
 }
+
+#[tokio::test]
+async fn reader_defaults_to_snippets_with_a_live_link_and_a_full_backup() {
+    let (state, _dir) = test_state();
+    let app = magpie::app(state);
+    let (payload, _quote) = capture_payload();
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/captures")
+                .header(
+                    header::CONTENT_TYPE,
+                    format!("multipart/form-data; boundary={BOUNDARY}"),
+                )
+                .body(multipart_capture(&payload))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let page_id = body_json(response).await["page"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Default view: a snippet card, the note, and a Text-Fragment deep link back
+    // to the live page at the highlighted words.
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/pages/{page_id}/reader"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let html = body_text(response).await;
+    assert!(
+        html.contains("class=\"snippet\""),
+        "default view is snippets"
+    );
+    assert!(
+        html.contains("a classic"),
+        "the note rides along with the snippet"
+    );
+    assert!(
+        html.contains("#:~:text=brown%20fox"),
+        "the live link carries a text fragment for the exact quote"
+    );
+    assert!(
+        html.contains("view=full"),
+        "a toggle offers the full snapshot backup"
+    );
+    assert!(
+        !html.contains("class=\"article-body\""),
+        "the full snapshot body is not rendered by default"
+    );
+
+    // The backup: the whole captured article, marks baked in.
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/pages/{page_id}/reader?view=full"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let html = body_text(response).await;
+    assert!(
+        html.contains("class=\"article-body\""),
+        "?view=full renders the full snapshot"
+    );
+    assert!(
+        html.contains("over the lazy dog"),
+        "full view keeps text outside the highlight's snippet"
+    );
+}

@@ -16,7 +16,9 @@ the page it came from. Single-user, local-first, one binary and one folder of da
 - **Capture** a text selection from any page in one action, with its source.
 - **Keep** a reader-view snapshot (content, cleanly presented - not a pixel screenshot) that
   outlives the original page.
-- **Read** it back with your highlights baked in and a scroll-spy "shiny things" rail.
+- **Read** it back as snippets - each highlight in its surrounding passage - with a scroll-spy
+  "shiny things" rail, a one-click deep link to the exact words on the live page, and the full
+  snapshot kept behind it as a backup.
 - **Find** anything you kept with full-text search across highlights, notes, and snapshot content.
 
 Everything runs locally, or on a remote host you choose - the same artifact either way.
