@@ -4,8 +4,13 @@
 // iridescence only on the shine.
 
 export interface Ui {
+  /** Show the pill for a *new* selection: reset shade/note/keep state, position. */
   showPill(rect: DOMRect, shade: string): void;
+  /** Reposition the already-shown pill for the same selection, keeping its state. */
+  repositionPill(rect: DOMRect): void;
   hidePill(): void;
+  /** True while the user is mid-note, so a transient selection loss shouldn't hide it. */
+  isEngaged(): boolean;
   showToast(text: string, tone: "ok" | "error"): void;
   setBusy(busy: boolean): void;
 }
@@ -56,7 +61,10 @@ const STYLE = `
 .toast.error .dot { background: #ff6b6b; }
 `;
 
-export function createUi(onKeep: (color: string, note: string | null) => void): Ui {
+export function createUi(
+  onKeep: (color: string, note: string | null) => void,
+  onDismiss?: () => void,
+): Ui {
   const host = document.createElement("div");
   host.style.cssText = "all: initial;";
   const root = host.attachShadow({ mode: "open" });
@@ -69,8 +77,11 @@ export function createUi(onKeep: (color: string, note: string | null) => void): 
 
   const pill = document.createElement("div");
   pill.className = "pill";
-  // Preserve the selection when interacting with the pill.
-  pill.addEventListener("mousedown", (e) => e.preventDefault());
+  // Preserve the page selection when interacting with the pill - except on the
+  // note input, which needs the click to focus and place its caret.
+  pill.addEventListener("mousedown", (e) => {
+    if (e.target !== noteInput) e.preventDefault();
+  });
 
   const shades = document.createElement("div");
   shades.className = "shades";
@@ -123,6 +134,21 @@ export function createUi(onKeep: (color: string, note: string | null) => void): 
   root.append(pill, toast);
   document.documentElement.appendChild(host);
 
+  // Dismiss on any pointer press outside the pill - including while the note is
+  // open, when a lost selection alone can't be trusted to hide it. composedPath
+  // sees through the shadow boundary, so presses inside the pill are excluded.
+  document.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (!pill.classList.contains("show")) return;
+      if (e.composedPath().includes(host)) return;
+      pill.classList.remove("show");
+      noteWrap.classList.remove("show");
+      onDismiss?.();
+    },
+    true,
+  );
+
   function setShade(id: string): void {
     currentShade = id;
     shadeButtons.forEach((btn, i) => btn.classList.toggle("active", SHADES[i].id === id));
@@ -133,6 +159,18 @@ export function createUi(onKeep: (color: string, note: string | null) => void): 
     onKeep(currentShade, note);
   }
 
+  // Position above the selection, clamped to the viewport.
+  function positionPill(rect: DOMRect): void {
+    pill.style.visibility = "hidden";
+    pill.classList.add("show");
+    const width = pill.offsetWidth || 240;
+    const top = Math.max(8, rect.top - (pill.offsetHeight || 40) - 8);
+    const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
+    pill.style.top = `${top}px`;
+    pill.style.left = `${left}px`;
+    pill.style.visibility = "visible";
+  }
+
   return {
     showPill(rect, shade) {
       setShade(shade);
@@ -140,18 +178,17 @@ export function createUi(onKeep: (color: string, note: string | null) => void): 
       noteInput.value = "";
       keepBtn.disabled = false;
       keepBtn.textContent = "Keep";
-      // Position above the selection, clamped to the viewport.
-      pill.style.visibility = "hidden";
-      pill.classList.add("show");
-      const width = pill.offsetWidth || 240;
-      const top = Math.max(8, rect.top - (pill.offsetHeight || 40) - 8);
-      const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
-      pill.style.top = `${top}px`;
-      pill.style.left = `${left}px`;
-      pill.style.visibility = "visible";
+      positionPill(rect);
+    },
+    repositionPill(rect) {
+      positionPill(rect);
     },
     hidePill() {
       pill.classList.remove("show");
+      noteWrap.classList.remove("show");
+    },
+    isEngaged() {
+      return noteWrap.classList.contains("show");
     },
     setBusy(busy) {
       keepBtn.disabled = busy;

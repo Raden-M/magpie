@@ -15,7 +15,9 @@ let settings: Settings | null = null;
 let lastSelection: SelectionSnapshot | null = null;
 let capturing = false;
 
-const ui = createUi(onKeep);
+const ui = createUi(onKeep, () => {
+  lastSelection = null;
+});
 
 void getSettings().then((s) => (settings = s));
 ext.storage.onChanged.addListener(() => {
@@ -28,13 +30,24 @@ document.addEventListener("selectionchange", () => {
   debounceTimer = window.setTimeout(updatePill, 150);
 });
 
+function sameSelection(a: SelectionSnapshot | null, b: SelectionSnapshot): boolean {
+  return !!a && a.quote === b.quote && a.prefix === b.prefix && a.suffix === b.suffix;
+}
+
 function updatePill(): void {
   const snapshot = readSelection();
   const rect = selectionRect();
   if (snapshot && rect) {
+    // Reposition on the same selection; only a genuinely new one resets the pill
+    // - otherwise opening the note (which fires selectionchange) would stomp it.
+    const same = sameSelection(lastSelection, snapshot);
     lastSelection = snapshot;
-    ui.showPill(rect, settings?.defaultShade ?? "iridescent");
+    if (same) ui.repositionPill(rect);
+    else ui.showPill(rect, settings?.defaultShade ?? "iridescent");
   } else {
+    // Focusing the note input can momentarily collapse the page selection; don't
+    // tear the pill down while the user is mid-note.
+    if (ui.isEngaged()) return;
     lastSelection = null;
     ui.hidePill();
   }
@@ -59,10 +72,14 @@ async function onKeep(color: string, note: string | null): Promise<void> {
       const noun = n === 1 ? "shiny thing" : "shiny things";
       ui.showToast(`Kept. ${n} ${noun} on this page.`, "ok");
       ui.hidePill();
+      // Clear the selection so it visibly deselects on Keep, rather than lingering.
+      window.getSelection()?.removeAllRanges();
+      lastSelection = null;
     } else {
       ui.showToast(result.error, "error");
     }
   } catch (err) {
+    console.error("magpie: capture failed", err);
     ui.showToast(
       err instanceof Error ? err.message : "Something went wrong keeping this.",
       "error",

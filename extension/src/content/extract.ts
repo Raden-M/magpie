@@ -1,11 +1,12 @@
 // Reader-view extraction. Runs Readability on a *clone* of the document (it
-// mutates its input), then sanitizes and assigns block ids. Falls back to a
-// selection-scoped capture so a highlight is never lost on a non-article page
-// (docs/05, step 2).
+// mutates its input), then sanitizes it. Falls back to a selection-scoped
+// capture so a highlight is never lost on a non-article page (docs/05, step 2).
+// Block ids and the final HTML are assigned by the caller *after* images are
+// stored and the content is decluttered, so they reflect what's really kept.
 
 import { Readability } from "@mozilla/readability";
 
-import { assignBlockIds, sanitizeToRoot } from "./sanitize.js";
+import { sanitizeToRoot } from "./sanitize.js";
 
 export interface Extraction {
   title: string;
@@ -13,11 +14,8 @@ export interface Extraction {
   siteName: string | null;
   lang: string | null;
   excerpt: string | null;
-  /** Sanitized, id-assigned reader HTML (the snapshot). */
-  contentHtml: string;
-  /** The same content as a live DOM root, for anchoring + normalization. */
+  /** Sanitized reader content as a live DOM root, for anchoring + normalization. */
   contentRoot: HTMLElement;
-  wordCount: number;
   /** True when Readability failed and we captured a fallback block. */
   partial: boolean;
 }
@@ -53,10 +51,6 @@ export function extractReader(doc: Document, fallbackBlock?: Element | null): Ex
   }
 
   const root = sanitizeToRoot(dirtyHtml, doc.baseURI);
-  assignBlockIds(root);
-
-  const text = (root.textContent ?? "").trim();
-  const wordCount = text ? text.split(/\s+/).length : 0;
 
   return {
     title: title.trim() || "Untitled",
@@ -64,9 +58,7 @@ export function extractReader(doc: Document, fallbackBlock?: Element | null): Ex
     siteName,
     lang,
     excerpt,
-    contentHtml: root.innerHTML,
     contentRoot: root,
-    wordCount,
     partial,
   };
 }

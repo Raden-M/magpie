@@ -44,10 +44,11 @@ async function handleCapture(msg: CaptureRequestMessage): Promise<CaptureResultM
     const response = await postCapture(settings, { payload: msg.payload, images });
     return { ok: true, response };
   } catch (err) {
+    console.error("magpie: capture failed", err);
     const error =
       err instanceof CaptureError
         ? err.message
-        : "Something went wrong keeping this. Please try again.";
+        : `Couldn't keep this: ${err instanceof Error ? err.message : String(err)}`;
     return { ok: false, error };
   }
 }
