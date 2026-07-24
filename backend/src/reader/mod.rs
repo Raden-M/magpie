@@ -5,3 +5,4 @@
 pub mod anchor;
 pub mod bake;
 pub mod normalize;
+pub mod snippet;
