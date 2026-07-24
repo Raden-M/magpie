@@ -1,14 +1,21 @@
 /* Magpie design system - structural colour.
  *
- * The interface is quiet monochrome; iridescence (blue -> teal -> purple) is the
- * only colour, spent on highlights and the states that echo them. Both themes
- * are first-class. See docs/07-design-system.md. */
+ * The interface is quiet monochrome and carries two accents. Iridescence
+ * (blue -> teal -> purple) belongs to the highlights: those stops are the shade
+ * a capture was saved with, so they answer to the data, not to taste. The brand
+ * blue is identity - mark, wordmark, and the UI states that echo them. Both
+ * themes are first-class. See docs/07-design-system.md. */
 
 :root {
   /* Iridescence - the accent, used only for highlights / active states. */
   --ir1: #2d5bff;
   --ir2: #16c0c0;
   --ir3: #8a3ffc;
+
+  /* Brand blue - identity only. Deeper here so it holds on a light ground. */
+  --b1: #1b9df5;
+  --b2: #2f6be6;
+  --b3: #3b4fd8;
 
   /* Neutrals - cool-biased, never a flat mid-grey. */
   --ink: #17181c;
@@ -20,17 +27,63 @@
   --read-bg: #fcfcfd;
   --read-ink: #1b1c21;
 
-  /* Highlight wash / underline strength per theme. */
+  /* Highlight wash / glow / top-edge gleam strength per theme. */
   --hl-wash: 13%;
   --hl-wash-active: 26%;
-  --hl-line: 82%;
+  --hl-glow: 30%;
+  --hl-sheen: rgba(255, 255, 255, 0.55);
 
-  --font-read: Georgia, "Iowan Old Style", Charter, "Times New Roman", serif;
+  /* Reading - the article column and every italic aside. Newsreader is drawn
+     for long-form reading on screens; Georgia stands in for any glyph outside
+     the latin subset we ship, so a Latin-Extended page degrades, not breaks. */
+  --font-read: "Newsreader", Georgia, "Iowan Old Style", Charter, serif;
+  /* Display - titles and headings. Fraunces is an old-style serif with real
+     character, drawn to pair with the wordmark's Bricolage Grotesque. */
+  --font-display: "Fraunces", Georgia, serif;
   --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-data: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  /* The wordmark alone. Bricolage Grotesque - uneven widths and cut terminals
+     give the name character the UI font lacks, and its flat heavy stems survive
+     the mark beside them where a high-contrast face would lose its hairlines.
+     Falls back to the UI font, which never shows in practice: the face is a
+     6-glyph file served same-origin with `font-display: block`. */
+  --font-brand: "Magpie Wordmark", var(--font-ui);
 
-  --grad: linear-gradient(101deg, var(--ir1), var(--ir2), var(--ir3));
+  --brand: linear-gradient(101deg, var(--b1), var(--b2), var(--b3));
   --measure: 34rem;
+}
+
+@font-face {
+  font-family: "Magpie Wordmark";
+  /* Token replaced at serve time with the fingerprinted URL (web/assets.rs). */
+  src: url(__MAGPIE_WORDMARK_WOFF2__) format("woff2");
+  font-weight: 600;
+  font-display: block;
+}
+
+/* Two variable faces, latin subset. `swap` so text paints in the Georgia
+   fallback immediately and reflows when the woff2 arrives - the reading column
+   is never blocked on a font. Tokens resolved at serve time (web/assets.rs). */
+@font-face {
+  font-family: "Fraunces";
+  src: url(__FRAUNCES_WOFF2__) format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Newsreader";
+  src: url(__NEWSREADER_WOFF2__) format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Newsreader";
+  src: url(__NEWSREADER_ITALIC_WOFF2__) format("woff2");
+  font-weight: 200 800;
+  font-style: italic;
+  font-display: swap;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -38,6 +91,9 @@
     --ir1: #5b7bff;
     --ir2: #2cd8d0;
     --ir3: #a76bff;
+    --b1: #7ad0ff;
+    --b2: #52a0ff;
+    --b3: #4f7cf7;
     --ink: #ecedf1;
     --ink-soft: #b9bbc4;
     --muted: #7e828f;
@@ -48,22 +104,27 @@
     --read-ink: #e7e8ee;
     --hl-wash: 20%;
     --hl-wash-active: 34%;
-    --hl-line: 92%;
+    --hl-glow: 42%;
+    --hl-sheen: rgba(255, 255, 255, 0.16);
   }
 }
 
 /* The viewer's explicit toggle wins over the OS preference, both directions. */
 :root[data-theme="light"] {
   --ir1: #2d5bff; --ir2: #16c0c0; --ir3: #8a3ffc;
+  --b1: #1b9df5; --b2: #2f6be6; --b3: #3b4fd8;
   --ink: #17181c; --ink-soft: #3c3e47; --muted: #83868f; --line: #e6e7ec;
   --ground: #f1f2f6; --panel: #ffffff; --read-bg: #fcfcfd; --read-ink: #1b1c21;
-  --hl-wash: 13%; --hl-wash-active: 26%; --hl-line: 82%;
+  --hl-wash: 13%; --hl-wash-active: 26%; --hl-glow: 30%;
+  --hl-sheen: rgba(255, 255, 255, 0.55);
 }
 :root[data-theme="dark"] {
   --ir1: #5b7bff; --ir2: #2cd8d0; --ir3: #a76bff;
+  --b1: #7ad0ff; --b2: #52a0ff; --b3: #4f7cf7;
   --ink: #ecedf1; --ink-soft: #b9bbc4; --muted: #7e828f; --line: #24262e;
   --ground: #0c0d11; --panel: #14161c; --read-bg: #121319; --read-ink: #e7e8ee;
-  --hl-wash: 20%; --hl-wash-active: 34%; --hl-line: 92%;
+  --hl-wash: 20%; --hl-wash-active: 34%; --hl-glow: 42%;
+  --hl-sheen: rgba(255, 255, 255, 0.16);
 }
 
 * { box-sizing: border-box; }
@@ -74,6 +135,7 @@ body {
   color: var(--ink);
   background: var(--ground);
   -webkit-font-smoothing: antialiased;
+  font-optical-sizing: auto;
   line-height: 1.5;
 }
 
@@ -84,8 +146,9 @@ a { color: inherit; }
 .topbar {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  padding: 0.85rem 1.5rem;
+  flex-wrap: wrap;
+  gap: 0.9rem 1.15rem;
+  padding: 0.7rem 1.15rem;
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--panel) 90%, transparent);
   backdrop-filter: saturate(1.4) blur(8px);
@@ -94,92 +157,192 @@ a { color: inherit; }
   z-index: 10;
 }
 
+/* The lockup: the mark beside the wordmark, the slogan set beneath the word in
+   the reading italic - so the name is written in the product's own reading
+   voice. The whole thing keys off one `font-size` on `.brand`: the mark is sized
+   in em and the slogan is a fraction of it, so a change to that one number moves
+   the lockup as a unit. */
 .brand {
-  font-weight: 650;
-  letter-spacing: -0.02em;
-  font-size: 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.5rem;
+  line-height: 1;
   text-decoration: none;
   color: var(--ink);
+}
+.brand-mark {
+  height: 1.8em;
+  width: auto;
+  flex: none;
+}
+.brand-stack {
+  display: flex;
+  flex-direction: column;
+  /* The gap sits below the "pie" underline; a touch of room so the slogan reads
+     as its own line rather than crowding the mark. */
+  gap: 0.5em;
+}
+.brand-word {
+  font-family: var(--font-brand);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-size: 1em;
+  line-height: 1;
   white-space: nowrap;
 }
+/* Set in the reading serif but upright, and in two tones: the verb phrase in the
+   soft ink, the noun it is hunting in muted - so "shiny things" reads as the
+   thing sought. */
+.brand-slogan {
+  font-family: var(--font-read);
+  font-weight: 400;
+  font-size: 0.6em;
+  line-height: 1;
+  letter-spacing: 0.005em;
+  color: var(--muted);
+}
+.brand-slogan-lead { color: var(--ink-soft); }
 .brand-pie {
-  background: var(--grad);
+  background: var(--brand);
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
-  border-bottom: 2px solid transparent;
-  border-image: var(--grad) 1;
+  /* A hair-thin gradient rule hugging the letters. */
+  border-bottom: 1.5px solid transparent;
+  border-image: var(--brand) 1;
   padding-bottom: 1px;
 }
 
-.topbar-meta {
+/* Return to the collection, sitting opposite the wordmark on the reader and the
+   about page. `margin-left: auto` puts it at the far end of the bar; on those
+   pages it is the only other thing there, so it reads as the way back. */
+.topbar-back {
   margin-left: auto;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 1rem;
-  font-family: var(--font-data);
-  font-size: 0.8rem;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-.source-link { text-decoration: none; color: var(--muted); }
-.source-link:hover { color: var(--ink); }
-
-/* --- Search box ----------------------------------------------------------- */
-
-.search-form { flex: 1; max-width: 30rem; }
-.search-input {
-  width: 100%;
+  gap: 0.3rem;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
-  padding: 0.5rem 0.85rem;
-  color: var(--ink);
-  background: var(--ground);
-  border: 1px solid var(--line);
+  font-size: 0.9rem;
+  font-weight: 550;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 0.4rem 0.7rem 0.4rem 0.55rem;
+  border: 1px solid transparent;
   border-radius: 8px;
-  outline: none;
-  transition: border-color 0.15s;
+  transition: color 0.15s, border-color 0.15s;
 }
-.search-input:focus {
-  border-color: transparent;
-  border-image: var(--grad) 1;
-}
-.search-input::placeholder { color: var(--muted); }
+.topbar-back:hover { color: var(--ink); border-color: var(--line); }
+.topbar-back:focus-visible { outline: 2px solid var(--b2); outline-offset: 2px; }
+.topbar-back svg { display: block; }
 
 /* --- Generic UI page containers ------------------------------------------- */
 
 .ui-main {
   max-width: 52rem;
   margin: 0 auto;
-  padding: 2rem 1.5rem 4rem;
+  padding: 1.5rem 1.15rem 3rem;
 }
 .ui-empty { color: var(--muted); margin-top: 3rem; text-align: center; }
 .footer {
   max-width: 52rem;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 1.5rem 1.15rem;
   color: var(--muted);
   font-family: var(--font-data);
   font-size: 0.75rem;
   border-top: 1px solid var(--line);
   font-variant-numeric: tabular-nums;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
 }
+.footer-link {
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.footer-link:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.footer-link:focus-visible { outline: 2px solid var(--b2); outline-offset: 2px; border-radius: 2px; }
 
 /* --- Collection ----------------------------------------------------------- */
 
+/* The search box sits above the list and filters it live (`collection.js`); the
+   magnifier and clear button are held inside the field, so the box reads as one
+   control. Without script it is a plain GET form and the clear is a link home. */
+.collection-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 2rem;
+  max-width: 34rem;
+}
+.collection-search-icon {
+  position: absolute;
+  left: 0.85rem;
+  display: flex;
+  color: var(--muted);
+  pointer-events: none;
+}
+.collection-search-input {
+  width: 100%;
+  font-family: var(--font-ui);
+  font-size: 0.98rem;
+  padding: 0.62rem 2.4rem 0.62rem 2.6rem;
+  color: var(--ink);
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.collection-search-input:focus {
+  border-color: transparent;
+  border-image: var(--brand) 1;
+}
+.collection-search-input::placeholder { color: var(--muted); }
+/* Suppress the browser's own clear affordance - ours lives beside it. */
+.collection-search-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.collection-search-clear {
+  position: absolute;
+  right: 0.55rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 6px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s, background-color 0.15s;
+}
+.collection-search-clear:hover { color: var(--ink); background: var(--line); }
+.collection-search-clear:focus-visible { outline: 2px solid var(--b2); outline-offset: 2px; }
+.collection-search-clear[hidden] { display: none; }
+
 .collection { list-style: none; margin: 0; padding: 0; }
 .collection-row {
-  padding: 1.15rem 0;
+  padding: 1.4rem 0;
   border-bottom: 1px solid var(--line);
   display: block;
   text-decoration: none;
   color: inherit;
 }
-.collection-row:hover .row-title { color: var(--ink); }
+/* Fraunces carries the scan; the whole ink weight sits on the title so the
+   source and preview can stay quiet beneath it. Hover reaches for brand blue. */
+.collection-row:hover .row-title { color: var(--b2); }
 .row-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--ink-soft);
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 480;
+  line-height: 1.24;
+  letter-spacing: -0.005em;
+  color: var(--ink);
   text-wrap: balance;
   transition: color 0.15s;
 }
@@ -187,20 +350,27 @@ a { color: inherit; }
   font-family: var(--font-data);
   font-size: 0.75rem;
   color: var(--muted);
-  margin-top: 0.2rem;
+  margin-top: 0.3rem;
 }
+/* A caught quote, so it is set as one: the reading italic, not a clipped line. */
 .row-preview {
-  margin-top: 0.5rem;
+  margin-top: 0.55rem;
   color: var(--ink-soft);
   font-family: var(--font-read);
-  font-size: 0.95rem;
+  font-style: italic;
+  font-size: 1.02rem;
+  line-height: 1.5;
+  max-width: 40rem;
 }
-.row-meta { margin-top: 0.5rem; }
+/* In a search preview the snippet's match markers should read as emphasis, not
+   as bold inside the italic - upright ink, so the hit stands where the eye lands. */
+.row-preview b { font-style: normal; font-weight: 600; color: var(--ink); }
+.row-meta { margin-top: 0.65rem; }
 .count {
   font-family: var(--font-data);
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
-  background: var(--grad);
+  background: var(--brand);
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
@@ -208,7 +378,13 @@ a { color: inherit; }
 }
 
 .page-head { margin-bottom: 2rem; }
-.page-head h1 { font-size: 1.6rem; letter-spacing: -0.02em; margin: 0 0 0.25rem; }
+.page-head h1 {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  margin: 0.1rem 0 0;
+}
 .section-label {
   text-transform: uppercase;
   letter-spacing: 0.15em;
@@ -230,83 +406,146 @@ a { color: inherit; }
 }
 .load-more:hover { color: var(--ink); border-color: var(--muted); }
 
-/* --- Search results ------------------------------------------------------- */
+/* --- About ---------------------------------------------------------------- */
 
-.search-summary { color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
-.search-results, .search-hits { list-style: none; margin: 0; padding: 0; }
-.search-group { padding: 1rem 0; border-bottom: 1px solid var(--line); }
-.search-page-title {
-  font-weight: 600;
-  color: var(--ink);
-  text-decoration: none;
-  font-size: 1.05rem;
+/* The page reads on the article surface (`.reader-body`) and holds the same
+   measure as the reader, so it makes its own argument: display face for the
+   title and headings, reading serif for the prose, the shine shown once in
+   context. */
+.about {
+  max-width: 38rem;
+  margin: 0 auto;
+  padding: 3.5rem 1.15rem 4rem;
+  color: var(--read-ink);
 }
-.search-page-title:hover { text-decoration: underline; }
-.search-hit {
-  display: flex;
-  gap: 0.75rem;
-  align-items: baseline;
-  margin-top: 0.6rem;
-}
-.hit-kind {
-  flex: none;
+.about-eyebrow {
+  font-family: var(--font-data);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 0.62rem;
-  font-weight: 700;
+  letter-spacing: 0.2em;
+  font-size: 0.7rem;
   color: var(--muted);
-  width: 5rem;
-  padding-top: 0.15rem;
+  margin: 0 0 1rem;
 }
-.hit-snippet {
-  color: var(--ink-soft);
-  text-decoration: none;
+.about-title {
+  font-family: var(--font-display);
+  font-weight: 540;
+  font-size: clamp(2.4rem, 6vw, 3.2rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin: 0 0 1.4rem;
+}
+.about-lede {
   font-family: var(--font-read);
-  font-size: 0.92rem;
+  font-style: italic;
+  font-size: 1.3rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  margin: 0 0 2.6rem;
 }
-.hit-snippet:hover { color: var(--ink); }
-.hit-snippet b { color: var(--ink); font-weight: 700; }
+.about-body {
+  font-family: var(--font-read);
+  font-size: 19px;
+  line-height: 1.68;
+}
+.about-body p { margin: 1.3rem 0; }
+.about-body h2 {
+  font-family: var(--font-display);
+  font-weight: 520;
+  font-size: 1.5rem;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  text-wrap: balance;
+  margin: 2.6rem 0 0;
+}
+.about-close {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.5rem;
+  letter-spacing: -0.01em;
+  color: var(--read-ink);
+  margin: 2.8rem 0 0 !important;
+}
 
 /* --- Reader --------------------------------------------------------------- */
 
 .reader-body { background: var(--read-bg); }
+/* One column on a phone, in document order: source, article, shiny things. The
+   wide layout in the `min-width` block below moves the two side pieces into a
+   rail without touching the markup. */
 .reader-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 17rem;
-  gap: 3rem;
-  max-width: 62rem;
-  margin: 0 auto;
-  padding: 2.5rem 1.5rem 6rem;
-  align-items: start;
+  gap: 1.75rem;
+  padding: 1.5rem 1.15rem 4rem;
+}
+/* The three stack against a shared measure so their left edges line up. */
+.reader-grid > * {
+  width: 100%;
+  max-width: var(--measure);
+  margin-inline: auto;
 }
 .article {
   color: var(--read-ink);
   font-family: var(--font-read);
-  font-size: 18.5px;
-  line-height: 1.66;
-  max-width: var(--measure);
-  margin: 0 auto;
-  justify-self: center;
+  font-size: 19px;
+  line-height: 1.68;
 }
 .article-title {
-  font-size: 2rem;
-  line-height: 1.2;
+  font-family: var(--font-display);
+  font-size: 2.3rem;
+  font-weight: 540;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+  margin: 0 0 2rem;
+}
+/* The article's own summary, set as an italic lede under the title. When it is
+   present the title tucks up against it; the body stays upright. */
+.article:has(.article-standfirst) .article-title { margin-bottom: 0.7rem; }
+.article-standfirst {
+  font-family: var(--font-read);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.22rem;
+  line-height: 1.45;
+  color: var(--ink-soft);
+  margin: 0 0 2rem;
+  text-wrap: pretty;
+}
+/* A dropped initial opens the full snapshot - the one flourish on the reading
+   surface, and only where there is continuous prose to carry it (the snippet
+   view has no single opening paragraph). It sits out if the article does not
+   begin with a paragraph. */
+.article-body > p:first-child::first-letter {
+  font-family: var(--font-display);
+  font-weight: 560;
+  font-size: 3.1em;
+  line-height: 0.8;
+  float: left;
+  margin: 0.02em 0.08em 0 0;
+  color: var(--ink);
+}
+/* Shared prose typography: the full snapshot and a snippet passage read the
+   same, so their inner elements answer to one set of rules. Headings take the
+   display face; the running text stays in the reading serif. */
+:is(.article-body, .snippet-passage) :is(h1, h2, h3) {
+  font-family: var(--font-display);
+  font-weight: 520;
   letter-spacing: -0.01em;
   text-wrap: balance;
-  margin: 0 0 0.5rem;
+  line-height: 1.25;
+  margin-top: 2rem;
 }
-.article-byline { color: var(--muted); font-family: var(--font-ui); font-size: 0.9rem; margin-bottom: 2rem; }
-.article-body :is(h1, h2, h3) { text-wrap: balance; line-height: 1.25; margin-top: 2rem; }
-.article-body p { margin: 1.15rem 0; }
-.article-body img { max-width: 100%; height: auto; border-radius: 6px; }
-.article-body a { color: var(--ir1); text-underline-offset: 2px; }
-.article-body blockquote {
+:is(.article-body, .snippet-passage) p { margin: 1.15rem 0; }
+:is(.article-body, .snippet-passage) img { max-width: 100%; height: auto; border-radius: 6px; }
+:is(.article-body, .snippet-passage) a { color: var(--ir1); text-underline-offset: 2px; }
+:is(.article-body, .snippet-passage) blockquote {
   margin: 1.5rem 0;
   padding-left: 1rem;
   border-left: 2px solid var(--line);
   color: var(--ink-soft);
 }
-.article-body pre {
+:is(.article-body, .snippet-passage) pre {
   overflow-x: auto;
   background: var(--ground);
   padding: 1rem;
@@ -315,47 +554,317 @@ a { color: inherit; }
   font-size: 0.85rem;
 }
 
-/* The shine: a soft iridescent wash + a crisp iridescent underline. */
+/* The shine: a blue slab lit from above and blooming outward - magpie plumage,
+ * where ir1 holds most of the sweep and the teal and violet only surface at its
+ * tail. The wash is translucent and the UA sheet paints <mark> yellow, so that
+ * background-color has to be cleared explicitly or light text lands on yellow.
+ * Wash strength is capped so --read-ink keeps ~7:1 against it in both themes.
+ *
+ * box-decoration-break is `slice` (the default), so the wash and its tail span
+ * the whole highlight as one box instead of being re-painted on every wrapped
+ * line. On a long multi-line highlight the teal-violet therefore surfaces once,
+ * at the true end - not at the end of each line, which read as busy.
+ *
+ * A quote broken by inline markup (a link, or the `700<span>&nbsp;</span>million`
+ * that Wikipedia emits) still bakes into one <mark> per text node it crosses. So
+ * every property that draws an *end* - side padding, a corner, a side of the ring,
+ * the iridescent tail - hangs off .hl-open / .hl-close rather than .hl, and the
+ * fragments between them render as plain middle that joins up seamlessly. The ring
+ * is inset so those shared edges can be side-by-side suppressed; an outset spread
+ * could not. State lives in custom properties so .is-active only restates what
+ * actually changes. */
 .hl {
-  background-image: linear-gradient(
-    101deg,
-    color-mix(in srgb, var(--ir1) var(--hl-wash), transparent),
-    color-mix(in srgb, var(--ir2) var(--hl-wash), transparent),
-    color-mix(in srgb, var(--ir3) var(--hl-wash), transparent)
-  );
-  border-bottom: 2px solid transparent;
-  border-image: linear-gradient(
-      101deg,
-      color-mix(in srgb, var(--ir1) var(--hl-line), transparent),
-      color-mix(in srgb, var(--ir2) var(--hl-line), transparent),
-      color-mix(in srgb, var(--ir3) var(--hl-line), transparent)
-    ) 1;
-  border-radius: 2px 2px 0 0;
+  --hl-w: var(--hl-wash);
+  --hl-body: color-mix(in srgb, var(--ir1) calc(var(--hl-w) + 16%), transparent);
+  --hl-sweep: linear-gradient(101deg, var(--hl-body), var(--hl-body));
+  --hl-ring: color-mix(in srgb, var(--ir1) 32%, transparent);
+  --hl-cap-open: 0 0 transparent;
+  --hl-cap-close: 0 0 transparent;
+  /* Outset shadows are redrawn per line fragment (slice only merges the wash),
+     so any horizontal blur streaks into the margin at every wrap. The bloom is
+     therefore a tight, downward-biased shadow with negative spread: it lifts the
+     wash off the page without a halo that fans sideways at each line end. */
+  --hl-bloom: 0 2px 6px -3px color-mix(in srgb, var(--ir1) calc(var(--hl-glow) / 2), transparent);
+
+  background-color: transparent;
+  background-image: linear-gradient(180deg, var(--hl-sheen), transparent 62%), var(--hl-sweep);
+  border-radius: 0;
+  /* Asymmetric top/bottom: the wash sits a hair higher so the text centres in it
+     rather than riding low over the descender space. Same overall height. */
+  padding: 0.11em 0 0.01em;
   color: inherit;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
+  box-shadow: inset 0 1px 0 var(--hl-ring), inset 0 -1px 0 var(--hl-ring),
+    var(--hl-cap-open), var(--hl-cap-close), var(--hl-bloom);
+  box-decoration-break: slice;
+  -webkit-box-decoration-break: slice;
   transition: background-image 0.25s, box-shadow 0.25s;
 }
-.hl.is-active {
-  background-image: linear-gradient(
+.hl-open {
+  --hl-cap-open: inset 1px 0 0 var(--hl-ring);
+  padding-left: 0.2em;
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+.hl-close {
+  --hl-cap-close: inset -1px 0 0 var(--hl-ring);
+  /* Blue holds most of the sweep; the teal-violet tail is compressed into the
+     last fifth so, spanning the whole highlight once (slice), it only lights the
+     true end. */
+  --hl-sweep: linear-gradient(
     101deg,
-    color-mix(in srgb, var(--ir1) var(--hl-wash-active), transparent),
-    color-mix(in srgb, var(--ir2) var(--hl-wash-active), transparent),
-    color-mix(in srgb, var(--ir3) var(--hl-wash-active), transparent)
+    var(--hl-body) 0%,
+    var(--hl-body) 80%,
+    color-mix(in srgb, var(--ir2) calc(var(--hl-w) + 8%), transparent) 93%,
+    color-mix(in srgb, var(--ir3) calc(var(--hl-w) + 5%), transparent) 100%
   );
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ir2) 30%, transparent),
-    0 2px 16px color-mix(in srgb, var(--ir3) 30%, transparent);
+  padding-right: 0.2em;
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+.hl.is-active {
+  --hl-w: var(--hl-wash-active);
+  --hl-ring: color-mix(in srgb, var(--ir1) 55%, transparent);
+  --hl-bloom: 0 3px 10px -4px color-mix(in srgb, var(--ir1) var(--hl-glow), transparent);
+}
+
+/* --- Snippet view --------------------------------------------------------- */
+
+/* The default reader: each highlight in its own passage, the full snapshot left
+ * behind as a backup. The cards stay monochrome - the thesis reserves colour for
+ * the highlight itself - and iridescence surfaces only as the faint thread that
+ * links one caught passage to the next, echoing the shiny-things rail. */
+.article--snippets {
+  display: flex;
+  flex-direction: column;
+  gap: 1.9rem;
+}
+.snippets-empty {
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.snippet {
+  position: relative;
+  padding: 1.35rem 1.55rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ir1) 3%, transparent), transparent 38%),
+    var(--panel);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04),
+    0 12px 30px -24px color-mix(in srgb, var(--ir1) 40%, transparent);
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+/* The thread in the gap above each passage but the first: a short vertical
+   gradient that fades in and out, so the snippets read as one strung sequence. */
+.snippet:not(:first-of-type)::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(-1.9rem - 1px);
+  transform: translateX(-50%);
+  width: 1px;
+  height: 1.9rem;
+  background: linear-gradient(180deg, transparent,
+    color-mix(in srgb, var(--ir1) 42%, transparent), transparent);
+}
+/* The passage holding the highlight you are reading lifts, but the shine is the
+   mark's own - the card only deepens its bloom and warms its edge. */
+.snippet:has(.hl.is-active) {
+  border-color: color-mix(in srgb, var(--ir1) 32%, var(--line));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05),
+    0 18px 46px -20px color-mix(in srgb, var(--ir1) 55%, transparent);
+}
+.snippet-passage {
+  color: var(--read-ink);
+  font-family: var(--font-read);
+  font-size: 18.5px;
+  line-height: 1.62;
+}
+.snippet-passage > :first-child { margin-top: 0; }
+.snippet-passage > :last-child { margin-bottom: 0; }
+
+/* Provenance for the passage: any notes, and the way back to the live page. */
+.snippet-meta {
+  margin-top: 1.05rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-family: var(--font-ui);
+}
+.snippet-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+.snippet-note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  font-style: italic;
+}
+.snippet-jump {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: var(--ir1);
+  text-decoration: none;
+}
+.snippet-jump:hover { text-decoration: underline; text-underline-offset: 2px; }
+.snippet-jump-arrow { transition: transform 0.15s; }
+.snippet-jump:hover .snippet-jump-arrow { transform: translate(1px, -1px); }
+.snippet-jump:focus-visible { outline: 2px solid var(--b2); outline-offset: 2px; border-radius: 2px; }
+
+/* A highlight the snapshot could no longer place: no passage to show, so the
+   quote stands alone, dashed and dimmed, still linking out to the live page. */
+.snippet--orphan {
+  border-style: dashed;
+  background: var(--panel);
+  box-shadow: none;
+}
+.snippet-orphan-tag {
+  margin: 0 0 0.65rem;
+  font-family: var(--font-ui);
+  font-size: 0.67rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+}
+.snippet-orphan-quote {
+  margin: 0;
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--line);
+  font-family: var(--font-read);
+  font-size: 1.02rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+/* The view switch, sitting in the source card. Two server-rendered links styled
+   as a segmented control; the current one is raised out of the track. */
+.view-toggle {
+  display: inline-flex;
+  gap: 2px;
+  margin-top: 1.25rem;
+  padding: 3px;
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.view-tab {
+  padding: 0.32rem 0.72rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--muted);
+  text-decoration: none;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+.view-tab:hover { color: var(--ink); }
+.view-tab.is-current {
+  color: var(--ink);
+  background: var(--panel);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+.view-tab:focus-visible { outline: 2px solid var(--b2); outline-offset: 1px; }
+
+/* --- Reader rail: source card --------------------------------------------- */
+
+/* Where the capture came from, and what it is. It heads the rail so the article
+ * column can stay pure content - a snapshot answers to Magpie's typography, not
+ * to the page it was taken from, so provenance has to be stated somewhere. */
+/* The rule under the card divides it from the article on a phone and from the
+   shiny things in the rail - one border serves both layouts. */
+.source {
+  padding-bottom: 1.4rem;
+  border-bottom: 1px solid var(--line);
+}
+.source-link {
+  display: block;
+  text-decoration: none;
+  color: var(--ink);
+}
+.source-site {
+  display: block;
+  font-weight: 650;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+/* The URL is evidence, so it is shown verbatim - clamped rather than elided so
+   a long path costs three lines at most, with the full string in the tooltip. */
+.source-url {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  margin-top: 0.3rem;
+  font-family: var(--font-data);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  transition: color 0.15s;
+}
+.source-link:hover .source-site { text-decoration: underline; text-underline-offset: 3px; }
+.source-link:hover .source-url { color: var(--ink-soft); }
+.source-byline {
+  margin: 0.9rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+/* Stacked above the article, the card is as wide as the text, so the facts run
+   as one wrapping line with each label beside its own value. Flinging values to
+   a far right edge across that width would read as two unrelated columns. */
+.source-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.15rem;
+  margin: 1.1rem 0 0;
+}
+.fact {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+.source-facts dt {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.65rem;
+  color: var(--muted);
+}
+.source-facts dd {
+  margin: 0;
+  font-family: var(--font-data);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+.source-partial {
+  margin: 1.1rem 0 0;
+  padding: 0.55rem 0.7rem;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--muted);
 }
 
 /* --- Shiny-things rail ---------------------------------------------------- */
 
 .rail {
-  position: sticky;
-  top: 5rem;
-  align-self: start;
   font-family: var(--font-ui);
-  max-height: calc(100vh - 7rem);
-  overflow-y: auto;
+  border-top: 1px solid var(--line);
+  padding-top: 1.5rem;
 }
 .rail-title {
   text-transform: uppercase;
@@ -373,7 +882,7 @@ a { color: inherit; }
   margin-bottom: 0.3rem;
   transition: border-color 0.2s;
 }
-.rail-item.is-active { border-left-color: var(--ir2); }
+.rail-item.is-active { border-left-color: var(--ir1); }
 .rail-item.is-active .rail-quote { color: var(--ink); }
 .rail-quote {
   display: block;
@@ -399,12 +908,168 @@ a { color: inherit; }
   color: var(--muted);
 }
 
-@media (max-width: 52rem) {
-  .reader-grid { grid-template-columns: 1fr; }
-  .rail { position: static; max-height: none; border-top: 1px solid var(--line); padding-top: 1.5rem; }
-  .topbar { flex-wrap: wrap; gap: 0.75rem; }
+/* --- The dock ------------------------------------------------------------- */
+
+/* Two utilities that follow the viewport: refresh, and back to top. Chrome, not
+ * content, so they take the neutrals and the topbar's own translucent panel -
+ * no iridescence, which is spent on the highlights, and no brand gradient,
+ * which belongs to the lockup. Only the focus ring reaches for brand blue, as
+ * the search box does. */
+
+/* The dock's own geometry, declared once: the page uses it to reserve the
+   ground the dock floats over, so a bottom line can never end up underneath it. */
+:root {
+  --dock-size: 2.75rem;
+  --dock-inset: 1.15rem;
+  --dock-clear: calc(var(--dock-size) + var(--dock-inset) * 2);
+}
+
+.dock {
+  position: fixed;
+  right: var(--dock-inset);
+  bottom: var(--dock-inset);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* 44px square - the smallest comfortable touch target, and wide enough that the
+   pair still reads as chrome rather than as two stray glyphs. */
+.dock-btn {
+  --lift: 0;
+  width: var(--dock-size);
+  height: var(--dock-size);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  backdrop-filter: saturate(1.4) blur(8px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  /* Dark mode lifts by surface - --panel already sits above --ground - so the
+     shadow is only doing work on the light theme. Hence a fixed black rather
+     than one mixed from --ink, which would turn into a glow on the dark one. */
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  transform: translateY(var(--lift));
+  transition: color 0.15s, border-color 0.15s, opacity 0.18s ease-out,
+    visibility 0.18s ease-out, transform 0.18s ease-out;
+}
+/* `display` here outranks the UA's `[hidden] { display: none }`, so the button
+   would ship visible - and dead - to anyone without the script. */
+.dock-btn[hidden] { display: none; }
+.dock-btn:hover { color: var(--ink); border-color: var(--muted); }
+.dock-btn:focus-visible { outline: 2px solid var(--b2); outline-offset: 2px; }
+.dock-btn:active { --lift: 1px; }
+.dock-btn svg { display: block; }
+
+/* Without the script the anchor is always there and always works. With it, the
+   link earns its place only once a screenful has gone by; it sits above the
+   refresh button so the one that stays put never moves under the cursor. */
+.dock[data-js] .dock-top {
+  --lift: 0.4rem;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.dock[data-js].is-up .dock-top {
+  --lift: 0;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+.dock[data-js].is-up .dock-top:active { --lift: 1px; }
+
+/* The reload is a navigation, so the press has to be acknowledged locally or
+   the button looks dead for as long as the round trip takes. */
+.dock-refresh.is-busy { color: var(--ink); }
+.dock-refresh.is-busy svg { animation: dock-spin 0.7s linear infinite; }
+@keyframes dock-spin { to { transform: rotate(1turn); } }
+
+/* The theme toggle carries both icons and shows the one for the theme in force:
+   the sun means "switch to light", so it rides the dark theme; the moon rides
+   the light. Keyed on data-theme, with the OS default under @media for the
+   no-choice case, and the explicit light rules kept last so a viewer who chose
+   light on a dark OS still sees the moon. */
+.dock-theme .icon-sun { display: none; }
+.dock-theme .icon-moon { display: block; }
+:root[data-theme="dark"] .dock-theme .icon-sun { display: block; }
+:root[data-theme="dark"] .dock-theme .icon-moon { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .dock-theme .icon-sun { display: block; }
+  :root:not([data-theme="light"]) .dock-theme .icon-moon { display: none; }
+}
+:root[data-theme="light"] .dock-theme .icon-sun { display: none; }
+:root[data-theme="light"] .dock-theme .icon-moon { display: block; }
+
+/* Ground reserved for the dock, so the last line of a page and the foot of a
+   full rail both scroll clear of it rather than under it. */
+.footer { padding-bottom: var(--dock-clear); }
+
+/* --- Wide layout ---------------------------------------------------------- */
+
+/* The only breakpoint: enough room for a reading measure plus a rail beside it.
+   Below this the base rules above already describe the page. */
+@media (min-width: 52rem) {
+  /* The dock keeps the same margin as the page gutter at this width. */
+  :root { --dock-inset: 1.5rem; }
+
+  .topbar { gap: 1.5rem; padding: 0.85rem 1.5rem; }
+  .ui-main { padding: 2rem 1.5rem 4rem; }
+  .footer { padding: 1.5rem 1.5rem var(--dock-clear); }
+
+  .reader-grid {
+    grid-template-columns: minmax(0, 1fr) 17rem;
+    /* The article spans both rows, so the rail's grid area inherits its full
+       height - the room `position: sticky` needs to travel in. */
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "article source"
+      "article rail";
+    column-gap: 3rem;
+    row-gap: 1.6rem;
+    max-width: 62rem;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 6rem;
+    align-items: start;
+  }
+  .reader-grid > * { max-width: none; }
+  .article {
+    grid-area: article;
+    max-width: var(--measure);
+    justify-self: center;
+  }
+  .source { grid-area: source; }
+  /* In the rail the column is narrow enough that a label/value list aligns
+     cleanly, so the pairs dissolve into a shared two-column grid. */
+  .source-facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: baseline;
+    gap: 0.4rem 0.75rem;
+  }
+  .fact { display: contents; }
+  .source-facts dd { justify-self: end; }
+  /* A full rail runs to the foot of the viewport, which is where the dock sits,
+     so its last shiny thing needs room to scroll past it. */
+  .rail {
+    grid-area: rail;
+    position: sticky;
+    top: 5rem;
+    align-self: start;
+    max-height: calc(100vh - 7rem);
+    overflow-y: auto;
+    border-top: 0;
+    padding-top: 0;
+    padding-bottom: var(--dock-clear);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; transition: none !important; }
+  /* The spin is feedback, but the reduced-motion contract outranks it - the
+     colour shift alone still says the press landed. */
+  .dock-refresh.is-busy svg { animation: none; }
 }

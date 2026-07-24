@@ -24,8 +24,25 @@ const CAPTURE_BODY_LIMIT: usize = 64 * 1024 * 1024;
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/", get(web::collection::page))
+        .route("/partials/collection", get(web::collection::fragment))
         .route("/assets/app.css", get(web::assets::app_css))
         .route("/assets/reader.js", get(web::assets::reader_js))
+        .route("/assets/dock.js", get(web::assets::dock_js))
+        .route("/assets/theme.js", get(web::assets::theme_js))
+        .route("/assets/collection.js", get(web::assets::collection_js))
+        .route(
+            "/assets/magpie-wordmark.woff2",
+            get(web::assets::wordmark_woff2),
+        )
+        .route("/assets/fraunces.woff2", get(web::assets::fraunces_woff2))
+        .route(
+            "/assets/newsreader.woff2",
+            get(web::assets::newsreader_woff2),
+        )
+        .route(
+            "/assets/newsreader-italic.woff2",
+            get(web::assets::newsreader_italic_woff2),
+        )
         .route(
             "/api/captures",
             post(captures::create_capture).layer(DefaultBodyLimit::max(CAPTURE_BODY_LIMIT)),
@@ -41,7 +58,7 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/search", get(search::search))
         .route("/api/stats", get(stats::get))
-        .route("/search", get(web::search::page))
+        .route("/about", get(web::about::page))
         .route("/media/{hash}", get(media::serve))
         .layer(middleware::from_fn_with_state(
             state.clone(),

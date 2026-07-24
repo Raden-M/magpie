@@ -203,6 +203,90 @@ async fn capture_read_search_round_trip() {
 }
 
 #[tokio::test]
+async fn collection_search_filters_live_and_renders_snippets() {
+    let (state, _dir) = test_state();
+    let app = magpie::app(state);
+    let (payload, _quote) = capture_payload();
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/captures")
+                .header(
+                    header::CONTENT_TYPE,
+                    format!("multipart/form-data; boundary={BOUNDARY}"),
+                )
+                .body(multipart_capture(&payload))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    // The full page carries the search box above the list.
+    let response = app
+        .clone()
+        .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let home = body_text(response).await;
+    assert!(
+        home.contains("class=\"collection-search\""),
+        "collection page renders the search box"
+    );
+    assert!(
+        home.contains("The Fox"),
+        "an unfiltered collection lists the kept page"
+    );
+
+    // The live-search fragment: a content term matches and the snippet is bolded.
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/partials/collection?q=lazy")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let fragment = body_text(response).await;
+    assert!(
+        fragment.contains("collection-row") && fragment.contains("The Fox"),
+        "a matching query surfaces the page as a row"
+    );
+    assert!(
+        fragment.contains("<b>lazy</b>"),
+        "the row preview bolds the matched term, got: {fragment}"
+    );
+    // The fragment is the list only - no page chrome.
+    assert!(
+        !fragment.contains("class=\"collection-search\""),
+        "the fragment carries no search box of its own"
+    );
+
+    // A term that matches nothing yields the empty state, not a stale list.
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/partials/collection?q=zznomatch")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let empty = body_text(response).await;
+    assert!(
+        empty.contains("Nothing matches") && !empty.contains("collection-row"),
+        "a non-matching query shows the empty state, got: {empty}"
+    );
+}
+
+#[tokio::test]
 async fn page_only_capture_has_no_highlight() {
     let (state, _dir) = test_state();
     let app = magpie::app(state);
@@ -239,4 +323,43 @@ async fn page_only_capture_has_no_highlight() {
     let created = body_json(response).await;
     assert!(created["highlight"].is_null());
     assert_eq!(created["page"]["highlight_count"], 0);
+}
+
+#[tokio::test]
+async fn ui_csp_allows_collection_search() {
+    // Regression: the collection search box upgrades to live search by fetching
+    // the `/partials/collection` fragment, and falls back to a plain `/` GET when
+    // script is off. A CSP without `connect-src 'self'` blocks the fetch, and one
+    // with `form-action 'none'` blocks the fallback submit - either way a typed
+    // query never reaches the (working) backend. Both the page and the fragment
+    // must permit same-origin connections and form submission.
+    let (state, _dir) = test_state();
+    let app = magpie::app(state);
+
+    for uri in ["/", "/?q=anything", "/partials/collection?q=anything"] {
+        let response = app
+            .clone()
+            .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK, "{uri} renders");
+        let csp = response
+            .headers()
+            .get(header::CONTENT_SECURITY_POLICY)
+            .expect("UI page sets a CSP")
+            .to_str()
+            .unwrap();
+        assert!(
+            csp.contains("connect-src 'self'"),
+            "{uri} CSP must allow the live-search fetch, got: {csp}"
+        );
+        assert!(
+            csp.contains("form-action 'self'"),
+            "{uri} CSP must allow the search form to fall back to a `/` submit, got: {csp}"
+        );
+        assert!(
+            !csp.contains("form-action 'none'"),
+            "{uri} CSP `form-action 'none'` blocks the search fallback"
+        );
+    }
 }
