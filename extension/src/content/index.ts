@@ -3,6 +3,7 @@
 // and handing it to the service worker.
 
 import { getSettings } from "../shared/config.js";
+import { errorMessage } from "../shared/errors.js";
 import { ext } from "../shared/ext.js";
 import { TRIGGER_CAPTURE } from "../shared/messages.js";
 import type { CaptureResultMessage } from "../shared/messages.js";
@@ -80,10 +81,7 @@ async function onKeep(color: string, note: string | null): Promise<void> {
     }
   } catch (err) {
     console.error("magpie: capture failed", err);
-    ui.showToast(
-      err instanceof Error ? err.message : "Something went wrong keeping this.",
-      "error",
-    );
+    ui.showToast(`Couldn't keep this: ${errorMessage(err)}`, "error");
   } finally {
     capturing = false;
     ui.setBusy(false);

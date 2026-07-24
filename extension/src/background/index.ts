@@ -5,6 +5,7 @@
 
 import { base64ToBlob } from "../shared/bytes.js";
 import { getSettings } from "../shared/config.js";
+import { errorMessage } from "../shared/errors.js";
 import { ext } from "../shared/ext.js";
 import { CaptureError, postCapture } from "../shared/http.js";
 import { CAPTURE_MESSAGE, TRIGGER_CAPTURE } from "../shared/messages.js";
@@ -46,9 +47,7 @@ async function handleCapture(msg: CaptureRequestMessage): Promise<CaptureResultM
   } catch (err) {
     console.error("magpie: capture failed", err);
     const error =
-      err instanceof CaptureError
-        ? err.message
-        : `Couldn't keep this: ${err instanceof Error ? err.message : String(err)}`;
+      err instanceof CaptureError ? err.message : `Couldn't keep this: ${errorMessage(err)}`;
     return { ok: false, error };
   }
 }

@@ -2,8 +2,26 @@
 // (it serializes as JSON, not structured clone), so the content script encodes
 // them and the service worker decodes them before POSTing.
 
+/**
+ * Bytes in *our* realm, whatever realm they arrived from.
+ *
+ * A Firefox content script runs in a sandbox whose DOM globals resolve to the
+ * page's through an Xray, so a `Blob` fetched here yields an ArrayBuffer owned
+ * by the page - and a view onto it is created over there too, however we
+ * construct it. Every subsequent species lookup (`subarray`, spread, `slice`)
+ * then reads that view's `constructor` across the boundary, which Firefox
+ * refuses: `Permission denied to access property "constructor"`. Element reads
+ * are allowed, so copying the view through our own constructor brings the bytes
+ * home. Chromium's isolated world shares our intrinsics, where this is just a
+ * copy.
+ */
+function ownBytes(data: ArrayBuffer | string): Uint8Array<ArrayBuffer> {
+  const view = typeof data === "string" ? new TextEncoder().encode(data) : new Uint8Array(data);
+  return new Uint8Array(view);
+}
+
 export async function blobToBase64(blob: Blob): Promise<string> {
-  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const bytes = ownBytes(await blob.arrayBuffer());
   let binary = "";
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) {
@@ -35,17 +53,17 @@ function toHex(bytes: Uint8Array): string {
  * dependency-free implementation when it is unavailable.
  */
 export async function sha256Hex(data: ArrayBuffer | string): Promise<string> {
-  const bytes = typeof data === "string" ? new TextEncoder().encode(data) : new Uint8Array(data);
+  const bytes = ownBytes(data);
   if (globalThis.crypto?.subtle) {
     const digest = await crypto.subtle.digest("SHA-256", bytes);
-    return toHex(new Uint8Array(digest));
+    return toHex(ownBytes(digest));
   }
   return toHex(sha256(bytes));
 }
 
 /** The dependency-free SHA-256 path, exposed for tests. */
 export function sha256HexPure(data: ArrayBuffer | string): string {
-  const bytes = typeof data === "string" ? new TextEncoder().encode(data) : new Uint8Array(data);
+  const bytes = ownBytes(data);
   return toHex(sha256(bytes));
 }
 
