@@ -25,13 +25,27 @@ pub struct BakeResult {
     pub located: HashSet<String>,
 }
 
+/// A parsed snapshot with every located highlight wrapped in `<mark>` spans.
+/// The full-article [`bake`] serializes its body; the snippet extractor
+/// ([`crate::reader::snippet`]) walks the same tree to pull out the blocks
+/// around each highlight - both work from this one marking pass.
+pub struct Marked {
+    pub document: NodeRef,
+    /// Ids of highlights that were successfully anchored (the rest are orphaned).
+    pub located: HashSet<String>,
+}
+
 /// A run to wrap within a single text node: `[start, end)` in char offsets.
 struct Segment {
     start: usize,
     end: usize,
     hl_id: String,
     color: String,
-    first: bool,
+    /// Whether this run is the first / last of its highlight in document order.
+    /// A quote broken by inline markup becomes several `<mark>`s, and only the
+    /// outermost two may be drawn with an end (see `.hl-open` / `.hl-close`).
+    opens: bool,
+    closes: bool,
 }
 
 fn char_to_byte(s: &str, char_idx: usize) -> usize {
@@ -41,14 +55,21 @@ fn char_to_byte(s: &str, char_idx: usize) -> usize {
         .unwrap_or(s.len())
 }
 
-fn make_mark(hl_id: &str, color: &str, first: bool) -> NodeRef {
+fn make_mark(hl_id: &str, color: &str, opens: bool, closes: bool) -> NodeRef {
     let name = QualName::new(None, ns!(html), LocalName::from("mark"));
+    let mut class = format!("hl hl-{color}");
+    if opens {
+        class.push_str(" hl-open");
+    }
+    if closes {
+        class.push_str(" hl-close");
+    }
     let mut attrs: Vec<(ExpandedName, Attribute)> = vec![
         (
             ExpandedName::new(ns!(), LocalName::from("class")),
             Attribute {
                 prefix: None,
-                value: format!("hl hl-{color}"),
+                value: class,
             },
         ),
         (
@@ -59,7 +80,7 @@ fn make_mark(hl_id: &str, color: &str, first: bool) -> NodeRef {
             },
         ),
     ];
-    if first {
+    if opens {
         attrs.push((
             ExpandedName::new(ns!(), LocalName::from("id")),
             Attribute {
@@ -82,6 +103,24 @@ fn in_ignored_container(node: &NodeRef) -> bool {
 }
 
 pub fn bake(content_html: &str, highlights: &[BakeHighlight<'_>]) -> BakeResult {
+    let marked = mark_document(content_html, highlights);
+
+    // Serialize the body's inner HTML.
+    let html = match marked.document.select_first("body") {
+        Ok(body) => body.as_node().children().map(|c| c.to_string()).collect(),
+        Err(_) => marked.document.to_string(),
+    };
+
+    BakeResult {
+        html,
+        located: marked.located,
+    }
+}
+
+/// Parse a snapshot, locate every highlight in its normalized text, and wrap the
+/// matching character ranges in `<mark>` spans - returning the live tree so a
+/// caller can either serialize it whole ([`bake`]) or extract regions of it.
+pub fn mark_document(content_html: &str, highlights: &[BakeHighlight<'_>]) -> Marked {
     let document = kuchikiki::parse_html().one(content_html);
 
     // 1. Collect text nodes in document order.
@@ -118,31 +157,26 @@ pub fn bake(content_html: &str, highlights: &[BakeHighlight<'_>]) -> BakeResult 
                 end,
                 hl_id: hl.id.to_string(),
                 color: hl.color.to_string(),
-                first: false,
+                opens: false,
+                closes: false,
             });
         }
     }
 
-    // Mark the first segment (document order) of each highlight so only it
-    // carries the unique jump-to `id`.
-    mark_first_segments(&mut per_piece);
+    // 4. Resolve overlaps first, so the edges are flagged on segments that
+    //    survive: the opening one also carries the unique jump-to `id`.
+    for segments in per_piece.values_mut() {
+        clip_overlaps(segments);
+    }
+    per_piece.retain(|_, segments| !segments.is_empty());
+    mark_edge_segments(&mut per_piece);
 
-    // 4. Rewrite each touched text node.
-    for (piece_idx, mut segments) in per_piece {
-        clip_overlaps(&mut segments);
-        if segments.is_empty() {
-            continue;
-        }
-        rewrite_text_node(&nodes[piece_idx], &pieces[piece_idx], &segments);
+    // 5. Rewrite each touched text node.
+    for (piece_idx, segments) in &per_piece {
+        rewrite_text_node(&nodes[*piece_idx], &pieces[*piece_idx], segments);
     }
 
-    // 5. Serialize the body's inner HTML.
-    let html = match document.select_first("body") {
-        Ok(body) => body.as_node().children().map(|c| c.to_string()).collect(),
-        Err(_) => document.to_string(),
-    };
-
-    BakeResult { html, located }
+    Marked { document, located }
 }
 
 /// Map a normalized `[start, end)` range to `(piece, start_off, end_off)` chunks,
@@ -163,23 +197,27 @@ fn piece_ranges(
     out
 }
 
-fn mark_first_segments(per_piece: &mut HashMap<usize, Vec<Segment>>) {
-    // Lowest (piece, start) per highlight is its first occurrence.
-    let mut first_pos: HashMap<String, (usize, usize)> = HashMap::new();
+/// Where a segment sits in the article: `(text node index, char offset)`.
+type Pos = (usize, usize);
+
+/// Flag the first and last segment of each highlight. Text nodes are collected
+/// in document order, so `Pos` orders segments the way they read.
+fn mark_edge_segments(per_piece: &mut HashMap<usize, Vec<Segment>>) {
+    let mut bounds: HashMap<String, (Pos, Pos)> = HashMap::new();
     for (&piece, segs) in per_piece.iter() {
         for seg in segs {
-            let entry = first_pos
-                .entry(seg.hl_id.clone())
-                .or_insert((piece, seg.start));
-            if (piece, seg.start) < *entry {
-                *entry = (piece, seg.start);
-            }
+            let pos = (piece, seg.start);
+            let entry = bounds.entry(seg.hl_id.clone()).or_insert((pos, pos));
+            entry.0 = entry.0.min(pos);
+            entry.1 = entry.1.max(pos);
         }
     }
     for (&piece, segs) in per_piece.iter_mut() {
         for seg in segs.iter_mut() {
-            if first_pos.get(&seg.hl_id) == Some(&(piece, seg.start)) {
-                seg.first = true;
+            let pos = (piece, seg.start);
+            if let Some(&(first, last)) = bounds.get(&seg.hl_id) {
+                seg.opens = pos == first;
+                seg.closes = pos == last;
             }
         }
     }
@@ -212,7 +250,7 @@ fn rewrite_text_node(node: &NodeRef, text: &str, segments: &[Segment]) {
             new_nodes.push(NodeRef::new_text(slice));
         }
         let slice = &text[char_to_byte(text, seg.start)..char_to_byte(text, seg.end)];
-        let mark = make_mark(&seg.hl_id, &seg.color, seg.first);
+        let mark = make_mark(&seg.hl_id, &seg.color, seg.opens, seg.closes);
         mark.append(NodeRef::new_text(slice));
         new_nodes.push(mark);
         cursor = seg.end;
@@ -279,6 +317,31 @@ mod tests {
         assert_eq!(res.html.matches("id=\"hl-h2\"").count(), 1);
         assert!(res.html.contains("brown</mark>"));
         assert!(res.html.contains(">fox</mark>") || res.html.contains(" fox</mark>"));
+        // Exactly one open and one close edge, so the pair draws as one run.
+        assert_eq!(res.html.matches("hl-open").count(), 1);
+        assert_eq!(res.html.matches("hl-close").count(), 1);
+    }
+
+    #[test]
+    fn interior_fragments_carry_no_edges() {
+        // Wikipedia's `700<span>&nbsp;</span>million`: the middle text node is a
+        // fragment of the quote with neither of its ends.
+        let html = "<article><p>at 700<span>\u{a0}</span>million and up.</p></article>";
+        let hls = vec![BakeHighlight {
+            id: "h4",
+            color: "iridescent",
+            selectors: sel("700 million", "at ", " and"),
+        }];
+        let res = bake(html, &hls);
+        assert!(res.located.contains("h4"));
+        assert_eq!(res.html.matches("data-hl=\"h4\"").count(), 3);
+        assert_eq!(res.html.matches("hl-open").count(), 1);
+        assert_eq!(res.html.matches("hl-close").count(), 1);
+        // The nbsp fragment is a plain middle - no edge classes at all.
+        assert!(
+            res.html
+                .contains("class=\"hl hl-iridescent\" data-hl=\"h4\">&nbsp;</mark>")
+        );
     }
 
     #[test]
