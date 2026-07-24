@@ -149,6 +149,49 @@ pub fn search(
     Ok(groups)
 }
 
+/// One collection row backed by a search hit: the matching page, its highlight
+/// count, and the best-ranked snippet (carrying `<b>` match markers) to show as
+/// the row's preview line.
+pub struct SearchPageRow {
+    pub page: crate::db::models::Page,
+    pub highlight_count: i64,
+    pub snippet: String,
+}
+
+/// Search, then shape the ranked page groups into collection rows for one page
+/// of results. Returns the window `[offset, offset + limit)` alongside the total
+/// number of matching pages, so the caller can decide whether more remain. This
+/// is the collection's search: the same BM25 engine as [`search`], hydrated with
+/// the page metadata the list renders.
+pub fn search_page_rows(
+    conn: &Connection,
+    match_query: &str,
+    cap: usize,
+    limit: usize,
+    offset: usize,
+) -> rusqlite::Result<(Vec<SearchPageRow>, usize)> {
+    let groups = search(conn, match_query, cap)?;
+    let total = groups.len();
+    let mut rows = Vec::new();
+    for group in groups.into_iter().skip(offset).take(limit) {
+        let Some(page) = crate::db::pages::get_page(conn, &group.page_id)? else {
+            continue;
+        };
+        let highlight_count = crate::db::pages::highlight_count(conn, &group.page_id)?;
+        let snippet = group
+            .hits
+            .first()
+            .map(|h| h.snippet.clone())
+            .unwrap_or_default();
+        rows.push(SearchPageRow {
+            page,
+            highlight_count,
+            snippet,
+        });
+    }
+    Ok((rows, total))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
