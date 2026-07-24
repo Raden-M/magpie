@@ -6,18 +6,32 @@
     <title>Magpie - Options</title>
     <style>
       :root { color-scheme: light dark; }
+      /* The wordmark face, shared with the app. Bundled beside this page; block
+         swap keeps the six-glyph file from flashing in a fallback shape. */
+      @font-face {
+        font-family: "Magpie Wordmark";
+        src: url(magpie-wordmark.woff2) format("woff2");
+        font-weight: 600;
+        font-display: block;
+      }
       body {
         font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
         background: #0c0d11; color: #ecedf1; margin: 0; padding: 2.5rem 1.5rem;
         display: flex; justify-content: center;
       }
       main { width: 100%; max-width: 30rem; }
-      h1 { font-weight: 650; letter-spacing: -0.02em; font-size: 1.5rem; margin: 0 0 0.25rem; }
+      /* Wordmark size lives here so the mark can be sized off it, as in the app. */
+      .brand { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem; font-size: 1.5rem; }
+      .brand img { height: 1.8em; width: auto; flex: none; }
+      h1 {
+        font-family: "Magpie Wordmark", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        font-weight: 600; letter-spacing: -0.02em; font-size: 1em; margin: 0;
+      }
       .brand-pie {
-        background: linear-gradient(101deg, #5b7bff, #2cd8d0, #a76bff);
+        background: linear-gradient(101deg, #7ad0ff, #52a0ff, #4f7cf7);
         -webkit-background-clip: text; background-clip: text; color: transparent;
         border-bottom: 2px solid transparent;
-        border-image: linear-gradient(101deg, #5b7bff, #2cd8d0, #a76bff) 1; padding-bottom: 1px;
+        border-image: linear-gradient(101deg, #7ad0ff, #52a0ff, #4f7cf7) 1; padding-bottom: 1px;
       }
       p.lede { color: #b9bbc4; margin: 0 0 2rem; font-size: 0.9rem; }
       label { display: block; margin: 1.25rem 0 0.4rem; font-size: 0.8rem; font-weight: 600; color: #b9bbc4; }
@@ -26,13 +40,13 @@
         padding: 0.55rem 0.75rem; color: #ecedf1; background: #14161c;
         border: 1px solid #24262e; border-radius: 8px; outline: none;
       }
-      input:focus, select:focus { border-color: transparent; border-image: linear-gradient(101deg, #5b7bff, #2cd8d0, #a76bff) 1; }
+      input:focus, select:focus { border-color: transparent; border-image: linear-gradient(101deg, #7ad0ff, #52a0ff, #4f7cf7) 1; }
       .hint { color: #7e828f; font-size: 0.75rem; margin-top: 0.35rem; }
       .row { display: flex; gap: 0.75rem; align-items: center; margin-top: 1.75rem; }
       button {
         font-size: 0.9rem; font-weight: 600; border: none; border-radius: 8px; padding: 0.6rem 1.1rem; cursor: pointer;
       }
-      button.primary { color: #0c0d11; background: linear-gradient(101deg, #5b7bff, #2cd8d0, #a76bff); }
+      button.primary { color: #0c0d11; background: linear-gradient(101deg, #7ad0ff, #52a0ff, #4f7cf7); }
       button.ghost { color: #b9bbc4; background: transparent; border: 1px solid #24262e; }
       button.ghost:hover { color: #ecedf1; }
       .status { margin-left: auto; font-size: 0.82rem; color: #7e828f; }
@@ -42,7 +56,10 @@
   </head>
   <body>
     <main>
-      <h1>Mag<span class="brand-pie">pie</span></h1>
+      <div class="brand">
+        <img src="icons/magpie.svg" alt="" />
+        <h1>Mag<span class="brand-pie">pie</span></h1>
+      </div>
       <p class="lede">Point the extension at your self-hosted Magpie backend.</p>
 
       <label for="backendUrl">Backend URL</label>

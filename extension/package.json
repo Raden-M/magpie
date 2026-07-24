@@ -7,12 +7,14 @@
   "scripts": {
     "build": "node build.mjs",
     "build:firefox": "node build.mjs --firefox",
+    "icons": "node scripts/generate-icons.mjs",
     "watch": "node build.mjs --watch",
     "watch:firefox": "node build.mjs --watch --firefox",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"tests/**/*.test.ts\""
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/chrome": "^0.0.290",
     "esbuild": "^0.24.0",
     "typescript": "^5.7.0"
