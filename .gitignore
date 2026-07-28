@@ -27,6 +27,6 @@ magpie.toml
 .idea/
 .vscode/
 
-# Private specification & planning — NOT for the open-source release.
-# Kept local only; a separate public README/docs will be written before publishing.
-/.planning/
+
+# Local-only planning, design docs, working notes and scratch. Never committed.
+/.local/

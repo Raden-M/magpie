@@ -33,6 +33,7 @@ pub fn brand() -> Markup {
 }
 
 const ICON_BACK: &str = r##"<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 18l-6-6 6-6"/></svg>"##;
+const ICON_ABOUT: &str = r##"<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.7-.9 1.3v.5"/><path d="M12 16.8h.01"/></svg>"##;
 
 /// A labeled return to the collection, for the chrome of pages that are not the
 /// collection itself (the reader, the about page). The wordmark links home too,
@@ -41,9 +42,21 @@ const ICON_BACK: &str = r##"<svg viewBox="0 0 24 24" width="16" height="16" fill
 /// history to go back through.
 pub fn back_to_collection() -> Markup {
     html! {
-        a class="topbar-back" href="/" {
+        a class="topbar-link" href="/" {
             (PreEscaped(ICON_BACK))
             span { "Collection" }
+        }
+    }
+}
+
+/// The way into `/about`, sitting opposite the wordmark on the collection. It is
+/// the one piece of chrome that explains the product, so it belongs where a
+/// first-time reader looks - not in the footer under the hoard.
+pub fn about_link() -> Markup {
+    html! {
+        a class="topbar-link" href="/about" {
+            (PreEscaped(ICON_ABOUT))
+            span { "What is Magpie?" }
         }
     }
 }
@@ -106,6 +119,7 @@ pub fn shell(title: &str, body: Markup) -> Markup {
                 // element, but naming the bar makes the dock's anchor explicit.
                 header id="top" class="topbar" {
                     (brand())
+                    (about_link())
                 }
                 (body)
                 (dock())

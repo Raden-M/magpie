@@ -293,7 +293,6 @@ fn render_body(query: &str, listing: &Listing, stats: &Stats) -> Markup {
                 (stats.highlights) " shiny thing" (plural(stats.highlights)) " · "
                 (stats.media) " image" (plural(stats.media))
             }
-            a class="footer-link" href="/about" { "What is Magpie?" }
         }
     }
 }

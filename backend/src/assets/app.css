@@ -214,10 +214,11 @@ a { color: inherit; }
   padding-bottom: 1px;
 }
 
-/* Return to the collection, sitting opposite the wordmark on the reader and the
-   about page. `margin-left: auto` puts it at the far end of the bar; on those
-   pages it is the only other thing there, so it reads as the way back. */
-.topbar-back {
+/* Chrome links sitting opposite the wordmark: the way back to the collection on
+   the reader and the about page, the way into the about page on the collection.
+   `margin-left: auto` on the first of them pushes the group to the far end of
+   the bar; any that follow sit beside it on the bar's own gap. */
+.topbar-link {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
@@ -232,9 +233,10 @@ a { color: inherit; }
   border-radius: 8px;
   transition: color 0.15s, border-color 0.15s;
 }
-.topbar-back:hover { color: var(--ink); border-color: var(--line); }
-.topbar-back:focus-visible { outline: 2px solid var(--b2); outline-offset: 2px; }
-.topbar-back svg { display: block; }
+.topbar-link ~ .topbar-link { margin-left: 0; }
+.topbar-link:hover { color: var(--ink); border-color: var(--line); }
+.topbar-link:focus-visible { outline: 2px solid var(--b2); outline-offset: 2px; }
+.topbar-link svg { display: block; }
 
 /* --- Generic UI page containers ------------------------------------------- */
 
@@ -259,14 +261,6 @@ a { color: inherit; }
   justify-content: space-between;
   gap: 0.5rem 1.5rem;
 }
-.footer-link {
-  color: var(--muted);
-  text-decoration: none;
-  transition: color 0.15s;
-}
-.footer-link:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
-.footer-link:focus-visible { outline: 2px solid var(--b2); outline-offset: 2px; border-radius: 2px; }
-
 /* --- Collection ----------------------------------------------------------- */
 
 /* The search box sits above the list and filters it live (`collection.js`); the
