@@ -2,28 +2,50 @@
 //!
 //! Auth is enforced whenever a token is set or the bind is non-loopback (see
 //! [`crate::config::Config::auth_required`]). When enforced it covers every
-//! route except liveness and static assets - so a remote instance never leaks
-//! the hoard by default. Browsers cannot send a bearer header on navigation, so
-//! remote *human* access to the web UI is expected to be fronted by the reverse
-//! proxy (docs/08-deployment.md); the token guards the extension's API path.
+//! route except liveness, static assets and the login form - so a remote
+//! instance never leaks the hoard by default.
+//!
+//! There are two credential shapes because there have to be. The extension
+//! sends the configured token as a bearer header, which is the only thing it
+//! can do. A browser cannot: nothing attaches an `Authorization` header to
+//! ordinary navigation, so a token-protected instance would render its own
+//! owner a JSON 401 on every page. Browsers therefore trade the token for a
+//! session cookie at `/login` (see [`crate::web::login`]), and either
+//! credential satisfies this middleware.
 
 use axum::extract::{Request, State};
-use axum::http::header::{AUTHORIZATION, CONTENT_TYPE};
+use axum::http::HeaderMap;
+use axum::http::header::{AUTHORIZATION, CONTENT_TYPE, COOKIE};
 use axum::http::{HeaderValue, Method};
 use axum::middleware::Next;
-use axum::response::{IntoResponse, Response};
+use axum::response::{IntoResponse, Redirect, Response};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
 use crate::error::AppError;
 use crate::state::AppState;
 
+/// The browser session cookie set by `POST /login`.
+pub const SESSION_COOKIE: &str = "magpie_session";
+
 /// Paths reachable without a token even when auth is on.
 fn is_exempt(path: &str) -> bool {
-    path == "/healthz" || path.starts_with("/assets/")
+    path == "/healthz" || path == "/login" || path.starts_with("/assets/")
+}
+
+/// The value of our session cookie, if the request carries one.
+fn session_cookie(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get(COOKIE)?
+        .to_str()
+        .ok()?
+        .split(';')
+        .filter_map(|crumb| crumb.trim().split_once('='))
+        .find(|(name, _)| *name == SESSION_COOKIE)
+        .map(|(_, value)| value)
 }
 
 /// Length-checked constant-time byte comparison.
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+pub(crate) fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
     }
@@ -45,17 +67,27 @@ pub async fn require_auth(State(state): State<AppState>, req: Request, next: Nex
         return AppError::Unauthorized.into_response();
     };
 
-    let presented = req
-        .headers()
+    let headers = req.headers();
+    let bearer_ok = headers
         .get(AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "));
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .is_some_and(|token| constant_time_eq(token.as_bytes(), expected.as_bytes()));
+    let session_ok = session_cookie(headers)
+        .is_some_and(|value| constant_time_eq(value.as_bytes(), state.session.as_bytes()));
 
-    match presented {
-        Some(token) if constant_time_eq(token.as_bytes(), expected.as_bytes()) => {
-            next.run(req).await
-        }
-        _ => AppError::Unauthorized.into_response(),
+    if bearer_ok || session_ok {
+        return next.run(req).await;
+    }
+
+    // A human who lands on a page gets the login form; the extension gets the
+    // JSON 401 its error handling already reads (`shared/http.ts`). Sending an
+    // HTML redirect to the API would turn a clear "check your token" into a
+    // parse failure.
+    if req.uri().path().starts_with("/api/") {
+        AppError::Unauthorized.into_response()
+    } else {
+        Redirect::to("/login").into_response()
     }
 }
 

@@ -6,6 +6,7 @@ pub mod about;
 pub mod assets;
 pub mod collection;
 pub mod layout;
+pub mod login;
 pub mod reader;
 
 /// CSP for server-rendered UI pages (collection, reader): our own

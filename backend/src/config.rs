@@ -26,6 +26,11 @@ pub struct Config {
     #[arg(long, env = "MAGPIE_ALLOWED_ORIGINS", value_delimiter = ',')]
     pub allowed_origins: Vec<String>,
 
+    /// Comma-separated hostnames this instance answers to, beyond loopback and
+    /// the bind address. Set this to the public name when behind a proxy.
+    #[arg(long, env = "MAGPIE_ALLOWED_HOSTS", value_delimiter = ',')]
+    pub allowed_hosts: Vec<String>,
+
     /// Per-image byte ceiling accepted at capture time.
     #[arg(long, env = "MAGPIE_MAX_IMAGE_BYTES", default_value_t = 5_000_000)]
     pub max_image_bytes: u64,

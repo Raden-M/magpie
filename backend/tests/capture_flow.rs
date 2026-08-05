@@ -2,8 +2,6 @@
 //! `oneshot`. Covers the normalization round-trip (a highlight captured with
 //! position offsets must bake onto the exact quote at render) and idempotency.
 
-use std::sync::Arc;
-
 use axum::body::{Body, to_bytes};
 use axum::http::{Request, StatusCode, header};
 use magpie::config::Config;
@@ -16,23 +14,25 @@ use tower::ServiceExt;
 const BOUNDARY: &str = "MAGPIEBOUNDARY";
 
 fn test_state() -> (AppState, tempfile::TempDir) {
+    test_state_with(|_| {})
+}
+
+/// A state whose config can be adjusted before the app is built - auth and the
+/// host allowlist are configured, so they can only be exercised this way.
+fn test_state_with(tweak: impl FnOnce(&mut Config)) -> (AppState, tempfile::TempDir) {
     let dir = tempfile::tempdir().unwrap();
-    let config = Config {
+    let mut config = Config {
         bind: "127.0.0.1:0".parse().unwrap(),
         data_dir: dir.path().to_path_buf(),
         token: None,
         allowed_origins: vec![],
+        allowed_hosts: vec![],
         max_image_bytes: 5_000_000,
         log: "warn".into(),
     };
+    tweak(&mut config);
     let db = Db::open(dir.path()).unwrap();
-    (
-        AppState {
-            db,
-            config: Arc::new(config),
-        },
-        dir,
-    )
+    (AppState::new(db, config), dir)
 }
 
 fn multipart_capture(payload: &Value) -> Body {
@@ -445,4 +445,157 @@ async fn reader_defaults_to_snippets_with_a_live_link_and_a_full_backup() {
         html.contains("over the lazy dog"),
         "full view keeps text outside the highlight's snippet"
     );
+}
+
+/// A locked instance: the token is what the extension would send.
+fn locked_state() -> (AppState, tempfile::TempDir) {
+    test_state_with(|c| c.token = Some("s3cret".into()))
+}
+
+#[tokio::test]
+async fn foreign_host_is_refused_before_anything_else() {
+    let (state, _dir) = test_state();
+    let app = magpie::app(state);
+
+    // The shape of a DNS-rebinding request: the attacker's name, our address.
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/")
+                .header(header::HOST, "evil.example.com")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::MISDIRECTED_REQUEST,
+        "a hostname we don't answer to is refused"
+    );
+
+    for host in ["127.0.0.1:8787", "localhost", "[::1]:8787"] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/")
+                    .header(header::HOST, host)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK, "{host} reaches the app");
+    }
+}
+
+#[tokio::test]
+async fn a_proxy_hostname_is_reachable_once_allowed() {
+    let (state, _dir) = test_state_with(|c| c.allowed_hosts = vec!["magpie.example.com".into()]);
+    let app = magpie::app(state);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/")
+                .header(header::HOST, "magpie.example.com")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn locked_instance_redirects_browsers_but_keeps_json_for_the_api() {
+    let (state, _dir) = locked_state();
+    let app = magpie::app(state);
+
+    // A browser navigating with no credentials is sent to the form, not handed
+    // JSON it would render as text.
+    let response = app
+        .clone()
+        .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    assert_eq!(response.headers()[header::LOCATION], "/login");
+
+    // The extension's path keeps the JSON 401 its error handling reads.
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/pages")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(body_json(response).await["error"]["code"], "unauthorized");
+
+    // The form itself must stay reachable, or there is no way in.
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/login")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn the_right_token_trades_for_a_session_that_opens_the_collection() {
+    let (state, _dir) = locked_state();
+    let app = magpie::app(state);
+
+    let post_login = |body: &'static str| {
+        app.clone().oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/login")
+                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .body(Body::from(body))
+                .unwrap(),
+        )
+    };
+
+    let response = post_login("token=wrong").await.unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::UNAUTHORIZED,
+        "a wrong token mints no session"
+    );
+    assert!(response.headers().get(header::SET_COOKIE).is_none());
+
+    let response = post_login("token=s3cret").await.unwrap();
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    let cookie = response.headers()[header::SET_COOKIE].to_str().unwrap();
+    assert!(cookie.contains("HttpOnly"), "not readable from script");
+    assert!(cookie.contains("SameSite=Strict"), "not sent cross-site");
+    assert!(
+        !cookie.contains("s3cret"),
+        "the token itself never reaches the browser"
+    );
+
+    // The session it just handed out opens the collection.
+    let session = cookie.split(';').next().unwrap().to_string();
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/")
+                .header(header::COOKIE, session)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
 }

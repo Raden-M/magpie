@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use clap::Parser;
 
 use magpie::config::Config;
@@ -13,10 +11,7 @@ async fn main() -> anyhow::Result<()> {
     check_startup_safety(&config)?;
 
     let db = Db::open(&config.data_dir)?;
-    let state = AppState {
-        db,
-        config: Arc::new(config.clone()),
-    };
+    let state = AppState::new(db, config.clone());
 
     let listener = tokio::net::TcpListener::bind(config.bind).await?;
     tracing::info!(bind = %config.bind, data_dir = %config.data_dir.display(), "magpie listening");
