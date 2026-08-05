@@ -8,14 +8,51 @@
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick start</a> ·
-  <a href="#how-it-works">How it works</a> ·
-  <a href="docs/usage.md">Full docs</a> ·
+  <a href="#get-started">Get started</a> ·
+  <a href="#what-it-does">What it does</a> ·
+  <a href="docs/usage.md">Docs</a> ·
   <a href="CONTRIBUTING.md">Contributing</a> ·
   <a href="LICENSE">MIT</a>
 </p>
 
 ---
+
+## Get started
+
+You'll need [Rust](https://rustup.rs) and [Node 23.6+](https://nodejs.org).
+
+```sh
+git clone https://github.com/Raden-M/magpie
+cd magpie
+make dev
+```
+
+Then load the extension into Firefox, once:
+
+1. Open `about:debugging` → **This Firefox** → **Load Temporary Add-on**
+2. Pick any file inside `extension/dist-firefox/`
+
+**Done.** Select text on any page and a pill appears - hit **Keep**. Your collection is at
+<http://127.0.0.1:8787>.
+
+There's nothing to configure. The extension ships pointed at your own machine, and a local Magpie
+needs no token, so there are no settings to fill in and no pairing step.
+
+> Firefox drops a temporary add-on when it restarts, so you re-load it after a restart. Permanent,
+> auto-updating installs arrive with the first signed release.
+
+## What it does
+
+- **Capture.** Select text, pick a colour, add a note, **Keep**. Or `Ctrl/Cmd+Shift+K` and skip the
+  pill. You never leave the page.
+- **Keep.** The article is saved with your highlight, as clean readable text rather than a
+  screenshot. It's still there after the page isn't.
+- **Read.** Each highlight comes back with the passage around it, a side rail that follows you down
+  the page, and a link straight to the words on the live site.
+- **Find.** Search every highlight, note, and saved article at once. Fast, and it never leaves your
+  machine.
+
+Single-user, local-first, one binary and one folder of data. No account, no cloud, no telemetry.
 
 ## Why
 
@@ -32,77 +69,53 @@ outlives the site.
 > against a black base. The interface works the same way: everything is quiet and grey, and the only
 > colour in the room is your highlights.
 
-## What it does
+## Other ways to run it
 
-- **Capture.** Select text on any page and a pill appears: pick a colour, add a note, hit **Keep**.
-  Or use `Ctrl/Cmd+Shift+K` and skip the pill. You never leave the page.
-- **Keep.** The article is saved with it, as clean readable text rather than a screenshot. Your
-  highlight is still there after the page isn't.
-- **Read.** Each highlight comes back with the passage around it, plus a side rail that follows you
-  down the page and a link straight to the words on the live site. The full article is one click
-  behind it.
-- **Find.** Search every highlight, note, and saved article at once. It's fast, and it never leaves
-  your machine.
-
-Single-user, local-first, one binary and one folder of data. Runs on your laptop or on a box you
-own - the same artifact either way, no account, no cloud, no telemetry.
-
-## Quick start
-
-Two steps: run the backend, then install the extension.
-
-### 1. Run the backend
-
-**With Docker** - no Rust toolchain needed:
+<details>
+<summary><b>Without Rust</b> - run the backend in Docker</summary>
 
 ```sh
 make docker-up
 ```
 
-Generates a token, starts Magpie on <http://127.0.0.1:8787>, and prints a connect string. Re-running
-it keeps the token you already have, and `make connect` prints that string again whenever you need
-it.
+Starts the backend in a container, builds the extension, generates a token and prints a connect
+string. Load the extension as above, then click the **Magpie icon** in the Firefox toolbar and paste
+that string into **Backend URL**. `make connect` prints it again if you lose it.
 
-**From source** - if you have Rust:
+A container is reachable from the Docker network rather than just your machine, which is why this
+path has a token and the from-source one doesn't.
+
+</details>
+
+<details>
+<summary><b>Always running</b> - so it survives a reboot</summary>
+
+`make dev` holds a terminal open. For a permanent local install, see
+[`packaging/`](packaging/README.md) for a systemd user unit, or leave the Docker instance up.
+
+</details>
+
+<details>
+<summary><b>On a server</b> - reachable from other machines</summary>
+
+Magpie sits behind a reverse proxy that terminates TLS, guarded by a token. Set it up with
+[`docs/usage.md`](docs/usage.md#deploying-remotely), then paste the connect string into the
+extension. You sign in to the web UI once per browser.
+
+</details>
+
+<details>
+<summary><b>Chromium</b> - works, but isn't the shipping target</summary>
 
 ```sh
-make backend
+make extension-chromium
 ```
 
-Serves <http://127.0.0.1:8787>. On loopback with no token auth is off, so that URL is your
-collection straight away - no token, no pairing string, nothing to paste.
+Then `chrome://extensions` → **Developer mode** → **Load unpacked** → `extension/dist`. There's no
+Chrome Web Store listing yet, and
+[a decision record](docs/decisions/2026-08-05-chrome-web-store-deferred.md) explains why.
 
-### 2. Build and install the extension
-
-Until the first signed release lands you build this yourself, so **Node >= 23.6 is required either
-way** - including the Docker route. `make dev` does the backend and the extension together if you
-want both from source.
-
-```sh
-make extension-firefox      # → extension/dist-firefox
-```
-
-In Firefox: `about:debugging` → **This Firefox** → **Load Temporary Add-on** → pick any file in
-`extension/dist-firefox`.
-
-Then **click the Magpie icon in the toolbar** - that opens its settings. Paste the connect string
-into **Backend URL** (it fills the token too), or just `http://127.0.0.1:8787` if you're running
-without a token, and hit **Save**. Saving asks permission to reach that one address, which is how
-Magpie works with a backend hosted anywhere.
-
-Highlight something.
-
-### Notes
-
-A temporary add-on is removed when Firefox restarts. Signed `.xpi` builds that install permanently
-and auto-update will be published to [Releases](https://github.com/Raden-M/magpie/releases).
-
-**Chromium** works but isn't a shipping target yet: `make extension`, then `chrome://extensions` →
-**Developer mode** → **Load unpacked** → `extension/dist`. See
-[the decision record](docs/decisions/2026-08-05-chrome-web-store-deferred.md).
-
-To keep Magpie running rather than holding a terminal open, see
-[`packaging/`](packaging/README.md) for the systemd user unit, or leave the Docker instance up.
+</details>
 
 ## How it works
 
@@ -121,9 +134,9 @@ in [`docs/decisions/`](docs/decisions/).
 
 ## Contributing
 
-Send the pull request - no need to open an issue and wait first. [`CONTRIBUTING.md`](CONTRIBUTING.md)
-covers the setup and the one thing that gets a change turned down (scope). Security problems are the
-exception and have [their own process](SECURITY.md).
+Send the pull request - no need to open an issue and wait first.
+[`CONTRIBUTING.md`](CONTRIBUTING.md) covers the setup and the one thing that gets a change turned
+down (scope). Security problems are the exception and have [their own process](SECURITY.md).
 
 ## License
 

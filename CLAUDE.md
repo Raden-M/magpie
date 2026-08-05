@@ -8,8 +8,8 @@ Global conventions live in `~/.claude/` and load automatically; they are not res
 ## Commands
 
 ```sh
-make dev              # build the Chromium extension, then run the backend
-make dev-firefox      # same, but build the Firefox variant into extension/dist-firefox
+make dev              # build the Firefox extension, then run the backend
+make extension-chromium  # the Chromium variant, into extension/dist
 make test             # cargo test + npm test
 make build            # release binary + extension
 make docker-up        # run in Docker, generating a token on first start

@@ -18,10 +18,11 @@ paths:
 - Expect **0 errors and 4 `UNSAFE_VAR_ASSIGNMENT` warnings**. Three are inside vendored Readability
   and DOMPurify; the fourth is `sanitize.ts` assigning DOMPurify's own output. A fifth means
   something new. Builds are never minified, so those line numbers point at readable code.
-- The backend is reached through an **optional** host permission requested at runtime for the one
-  configured origin (`options.ts`). Never move it back to a required `host_permissions`: adding a
-  required host permission after publication disables the extension for every installed user until
-  each re-accepts it.
+- Only the **default local backend** (`127.0.0.1:8787`, `localhost:8787`) is a required
+  `host_permissions`, so an install pointed at a local Magpie works with no configuration at all.
+  Every other backend is an **optional** permission requested at runtime for that one origin
+  (`options.ts`). Never *widen* the required list after publication: a new required host permission
+  disables the extension for every installed user until each re-accepts it.
 - MV3 service workers are ephemeral. Keep no long-lived in-memory state in `src/background/`;
   persist to `chrome.storage`.
 - The token lives in `chrome.storage.local`, never `sync`, so it is not uploaded to the browser

@@ -13,14 +13,14 @@ directly through native type stripping, and an older Node fails with a confusing
 `make` checks both before doing anything.
 
 ```sh
-make dev            # build the Chromium extension, then serve http://127.0.0.1:8787
-make dev-firefox    # same, but the Firefox build
-make test           # backend and extension suites
-make lint-firefox   # Mozilla's own add-on linter, the one AMO runs
+make dev                 # build the Firefox extension, then serve http://127.0.0.1:8787
+make extension-chromium  # the Chromium build, when you're touching that path
+make test                # backend and extension suites
+make lint-firefox        # Mozilla's own add-on linter, the one AMO runs
 ```
 
 There is no configuration to do. On loopback with no token, auth is off and the collection is at
-<http://127.0.0.1:8787>.
+<http://127.0.0.1:8787>. Firefox is the shipping target, so the unqualified targets build it.
 
 ## Before you open a pull request
 
