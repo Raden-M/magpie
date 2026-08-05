@@ -62,7 +62,10 @@ Everything mutable is one directory - copy it to relocate the instance:
 magpie.db            # SQLite (+ -wal, -shm)
 snapshots/<id>.html  # sanitized reader HTML per snapshot version
 media/<hash>         # content-addressed images
+session.key          # browser session key, created on first run (owner-only)
 ```
+
+Deleting `session.key` signs every browser out; it is recreated on the next start.
 
 Startup is idempotent: it creates the schema and directories if missing and migrates forward if
 present, never clobbering existing data. It refuses to start if the data dir isn't writable, or if
@@ -150,10 +153,11 @@ loopback worth binding to, so a token is always required; the published port is 
 - **Auth** is a single shared secret in two shapes. The extension sends it as a bearer token on
   every API call. Browsers can't attach a bearer header to ordinary navigation, so they exchange it
   once at `/login` for a session cookie (`HttpOnly`, `SameSite=Strict`, and `Secure` when the
-  request arrived over HTTPS). The cookie carries a key minted at startup, never the token itself,
-  so nothing durable is stored in the browser and restarting Magpie signs every browser out. Both
-  are compared in constant time. Everything is behind it except `/healthz`, `/login` and static
-  assets.
+  request arrived over HTTPS). The cookie carries a key kept in `session.key`, never the token
+  itself, so what sits in the browser can't be replayed against the API. That key is owner-only and
+  lives beside the collection - anyone who can read it can already read every highlight next to it.
+  Both credentials are compared in constant time. Everything is behind auth except `/healthz`,
+  `/login` and static assets.
 - **Host allowlist.** Binding to loopback doesn't make Magpie unreachable: every page you visit can
   issue requests to `127.0.0.1`, and DNS rebinding defeats CORS outright by making the response
   same-origin. Requests must carry a `Host` we answer to - loopback, the bind address, or

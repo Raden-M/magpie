@@ -5,7 +5,7 @@
 //! own owner with a JSON 401 on every URL, so the collection is only readable
 //! from the machine it runs on. Here the token is exchanged, once, for a
 //! session cookie carrying [`AppState::session`] - never the token itself, so
-//! nothing durable is left in the browser and a restart signs everyone out.
+//! what sits in the browser cannot be replayed against the API.
 
 use axum::extract::{Form, State};
 use axum::http::StatusCode;
@@ -102,7 +102,7 @@ fn render(error: Option<&str>) -> Markup {
                     h1 class="login-title" { "One token stands between you and the hoard." }
                     p class="login-lede" {
                         "This Magpie is protected. Paste the same token the extension uses "
-                        "and it'll remember this browser until the server restarts."
+                        "and it'll remember this browser."
                     }
                     form class="login-form" method="post" action="/login" {
                         label class="login-label" for="token" { "Token" }
