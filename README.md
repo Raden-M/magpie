@@ -42,8 +42,7 @@ make dev
 
 Then load the extension into Firefox, once:
 
-1. Copy `about:debugging#/runtime/this-firefox` into the address bar - Firefox blocks links to its
-   own internal pages, so this one can't be clickable
+1. Copy `about:debugging#/runtime/this-firefox` into the address bar
 2. **Load Temporary Add-on** → pick any file inside `extension/dist-firefox/`
 
 **Done.** Select text on any page and a pill appears - hit **Keep**. Your collection is at
