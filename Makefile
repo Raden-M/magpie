@@ -27,7 +27,7 @@ check-node:
 dev: extension ## Build the extension, then run the backend - the one command to start
 	@echo
 	@echo "  Extension built. Load it once, in Firefox:"
-	@echo "    about:debugging  ->  This Firefox  ->  Load Temporary Add-on"
+	@echo "    about:debugging#/runtime/this-firefox  ->  Load Temporary Add-on"
 	@echo "    ->  pick any file in extension/dist-firefox/"
 	@echo
 	@echo "  Then highlight something. No settings to fill in for a local backend."
@@ -62,7 +62,7 @@ docker-up: extension ## Run the backend in Docker and build the extension
 	docker compose up -d
 	@echo
 	@echo "  Load the extension once, in Firefox:"
-	@echo "    about:debugging  ->  This Firefox  ->  Load Temporary Add-on"
+	@echo "    about:debugging#/runtime/this-firefox  ->  Load Temporary Add-on"
 	@echo "    ->  pick any file in extension/dist-firefox/"
 	@echo
 	@$(MAKE) --no-print-directory connect
@@ -78,7 +78,7 @@ connect: ## Print the pairing string for the running Docker instance
 	@echo
 
 lint-firefox: extension ## Run Mozilla's own add-on linter over the Firefox build
-	cd extension && npx --yes web-ext lint --source-dir=dist-firefox --self-hosted
+	cd extension && npm run lint:firefox
 
 licenses: check-rust check-node ## Regenerate THIRD-PARTY.md from the dependency graphs
 	node scripts/generate-third-party.mjs

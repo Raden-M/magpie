@@ -9,13 +9,26 @@
 
 <p align="center">
   <a href="#get-started">Get started</a> ·
-  <a href="#what-it-does">What it does</a> ·
+  <a href="#why">Why</a> ·
   <a href="docs/usage.md">Docs</a> ·
   <a href="CONTRIBUTING.md">Contributing</a> ·
   <a href="LICENSE">MIT</a>
 </p>
 
 ---
+
+<!-- DEMO RECORDING -----------------------------------------------------------
+     Drag the video file into the GitHub README editor; GitHub uploads it and
+     leaves a https://github.com/user-attachments/... URL in its place. Put that
+     URL in the src below and delete these comment markers.
+
+<p align="center">
+  <video src="PASTE_THE_USER_ATTACHMENTS_URL_HERE" controls muted loop playsinline width="100%"></video>
+</p>
+
+<p align="center"><em>Highlight, keep, and find it again - the whole loop in under a minute.</em></p>
+
+----------------------------------------------------------------------------- -->
 
 ## Get started
 
@@ -29,8 +42,9 @@ make dev
 
 Then load the extension into Firefox, once:
 
-1. Open `about:debugging` → **This Firefox** → **Load Temporary Add-on**
-2. Pick any file inside `extension/dist-firefox/`
+1. Copy `about:debugging#/runtime/this-firefox` into the address bar - Firefox blocks links to its
+   own internal pages, so this one can't be clickable
+2. **Load Temporary Add-on** → pick any file inside `extension/dist-firefox/`
 
 **Done.** Select text on any page and a pill appears - hit **Keep**. Your collection is at
 <http://127.0.0.1:8787>.
@@ -41,19 +55,6 @@ needs no token, so there are no settings to fill in and no pairing step.
 > Firefox drops a temporary add-on when it restarts, so you re-load it after a restart. Permanent,
 > auto-updating installs arrive with the first signed release.
 
-## What it does
-
-- **Capture.** Select text, pick a colour, add a note, **Keep**. Or `Ctrl/Cmd+Shift+K` and skip the
-  pill. You never leave the page.
-- **Keep.** The article is saved with your highlight, as clean readable text rather than a
-  screenshot. It's still there after the page isn't.
-- **Read.** Each highlight comes back with the passage around it, a side rail that follows you down
-  the page, and a link straight to the words on the live site.
-- **Find.** Search every highlight, note, and saved article at once. Fast, and it never leaves your
-  machine.
-
-Single-user, local-first, one binary and one folder of data. No account, no cloud, no telemetry.
-
 ## Why
 
 The internet quietly deletes itself. The paragraph that changed your mind is behind a paywall now,
@@ -62,7 +63,8 @@ read-later apps save an article you will not reread; notes apps save a quote wit
 where it came from.
 
 Magpie saves the sentence **and** the page around it, on hardware you control, in a format that
-outlives the site.
+outlives the site. Single-user, local-first, one binary and one folder of data - no account, no
+cloud, no telemetry.
 
 > A magpie's blue-green-purple is *structural colour*: the feather holds no blue pigment. The colour
 > is an interference effect that appears only when light catches the structure at the right angle,

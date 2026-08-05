@@ -86,7 +86,7 @@ jobs:
       # rejection caught in seconds instead of days.
       - name: Lint the add-on
         working-directory: extension
-        run: npx --yes web-ext lint --source-dir=dist-firefox --self-hosted --output=json > lint.json
+        run: npx web-ext lint --source-dir=dist-firefox --self-hosted --output=json > lint.json
 
       # web-ext exits non-zero on errors only. Four warnings are expected and
       # irreducible - three inside vendored Readability and DOMPurify, one where
