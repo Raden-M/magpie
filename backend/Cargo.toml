@@ -11,7 +11,7 @@ bytes = "1.12.1"
 clap = { version = "4.6.4", features = ["derive", "env"] }
 dirs = "6.0.0"
 getrandom = "0.4.3"
-html5ever = "0.26"
+html5ever = "0.39"
 kuchikiki = "0.8.2"
 maud = { version = "0.27.0", features = ["axum"] }
 r2d2 = "0.8.10"
