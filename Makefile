@@ -4,7 +4,7 @@ export PATH := $(HOME)/.cargo/bin:$(PATH)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help dev dev-firefox extension extension-firefox backend test build docker
+.PHONY: help dev dev-firefox extension extension-firefox backend test build docker lint-firefox licenses
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -34,3 +34,9 @@ test: ## Run backend and extension tests
 
 docker: ## Build the release container image
 	cd backend && docker build -t magpie:latest .
+
+lint-firefox: extension-firefox ## Run Mozilla's own add-on linter over the Firefox build
+	cd extension && npx --yes web-ext lint --source-dir=dist-firefox --self-hosted
+
+licenses: ## Regenerate THIRD-PARTY.md from the dependency graphs
+	node scripts/generate-third-party.mjs

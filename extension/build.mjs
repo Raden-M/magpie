@@ -1,5 +1,5 @@
 import { build, context } from "esbuild";
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -25,7 +25,16 @@ const buildOptions = {
   target: "es2022",
   platform: "browser",
   sourcemap: watch ? "inline" : false,
-  minify: !watch,
+  // Never minified, even for release. A content script that runs on every page
+  // should be readable by whoever is asked to trust it, and AMO requires a
+  // separate source submission for machine-generated code - which this avoids.
+  // It also keeps addons-linter's innerHTML warnings pointing at real lines, so
+  // a reviewer can see the DOMPurify call right above ours.
+  minify: false,
+  // Bundled dependencies carry their licences out into `*.js.LEGAL.txt` rather
+  // than losing them: Readability is Apache-2.0 and DOMPurify MPL-2.0 or
+  // Apache-2.0, and Apache-2.0 requires the notices travel with the code.
+  legalComments: "external",
   logLevel: "info",
 };
 
@@ -35,8 +44,26 @@ function toFirefox(manifest) {
   // Firefox MV3 uses a non-persistent event page, not a service worker.
   m.background = { scripts: ["background.js"] };
   // Firefox requires an explicit add-on id and a minimum version.
+  //
+  // 140 is the floor because `data_collection_permissions` is ignored below it,
+  // and a consent declaration nobody is shown is worth nothing. 140 is itself
+  // the current ESR, so this drops only the older ESR lines.
+  //
+  // `websiteContent` is the honest declaration: page content leaves the browser
+  // for a server. That the server is the user's own doesn't change what is
+  // transmitted, and AMO asks what is collected, not who receives it.
+  //
+  // `update_url` is what makes a self-hosted, unlisted-signed .xpi keep itself
+  // current; `latest/download` always resolves to the newest release.
   m.browser_specific_settings = {
-    gecko: { id: "magpie@raden.me", strict_min_version: "115.0" },
+    gecko: {
+      id: "magpie@raden.me",
+      strict_min_version: "140.0",
+      data_collection_permissions: { required: ["websiteContent"] },
+      update_url: "https://github.com/Raden-M/magpie/releases/latest/download/updates.json",
+    },
+    // Android carries the same declaration, and only got it in 142.
+    gecko_android: { strict_min_version: "142.0" },
   };
   // Firefox expects options under options_ui.
   if (m.options_page) {
@@ -73,6 +100,55 @@ async function copyStatic() {
   await writeManifest();
 }
 
+/**
+ * Ship the licence of everything bundled into the extension.
+ *
+ * Readability is Apache-2.0 and DOMPurify MPL-2.0 or Apache-2.0, and both are
+ * compiled into `content.js`, so their licences have to travel with it.
+ * esbuild's `legalComments` only carries banners the source happens to mark as
+ * legal - Readability has none - so the text is read from the installed
+ * packages instead. Generated rather than written by hand so it cannot drift
+ * from what is actually bundled.
+ */
+async function writeThirdPartyNotices() {
+  const pkg = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+  const sections = [];
+
+  for (const name of Object.keys(pkg.dependencies ?? {})) {
+    const dir = resolve(root, "node_modules", name);
+    const meta = JSON.parse(await readFile(resolve(dir, "package.json"), "utf8"));
+    const licenceFiles = (await readdir(dir)).filter((f) => /^licen[cs]e/i.test(f)).sort();
+
+    const texts = [];
+    for (const file of licenceFiles) {
+      texts.push(await readFile(resolve(dir, file), "utf8"));
+    }
+    sections.push(
+      `${name} ${meta.version}\nLicense: ${meta.license}\n${meta.homepage ?? ""}\n\n` +
+        texts.join("\n\n"),
+    );
+  }
+
+  const divider = `\n\n${"-".repeat(76)}\n\n`;
+  await writeFile(
+    resolve(outdir, "THIRD-PARTY.txt"),
+    `Magpie bundles the following third-party code into this extension.\n` +
+      `Magpie itself is MIT licensed; see LICENSE in the source repository.\n${divider}` +
+      sections.join(divider) +
+      "\n",
+  );
+}
+
+/** `legalComments: "external"` emits one file per bundle, including for the
+ *  bundles with nothing vendored in them. Ship only the ones with content. */
+async function dropEmptyLegalFiles() {
+  for (const name of await readdir(outdir)) {
+    if (!name.endsWith(".LEGAL.txt")) continue;
+    const path = resolve(outdir, name);
+    if ((await stat(path)).size === 0) await rm(path);
+  }
+}
+
 async function run() {
   await rm(outdir, { recursive: true, force: true });
   await copyStatic();
@@ -83,6 +159,8 @@ async function run() {
     console.log(`watching for changes -> ${firefox ? "dist-firefox" : "dist"}/`);
   } else {
     await build(buildOptions);
+    await dropEmptyLegalFiles();
+    await writeThirdPartyNotices();
     console.log(`built extension -> ${firefox ? "dist-firefox" : "dist"}/`);
   }
 }
