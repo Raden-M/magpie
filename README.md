@@ -58,7 +58,8 @@ make docker-up
 ```
 
 Generates a token, starts Magpie on <http://127.0.0.1:8787>, and prints a connect string to paste
-into the extension. Re-running it keeps the token you already have.
+into the extension. Re-running it keeps the token you already have, and `make connect` prints that
+string again whenever you need it.
 
 ### From source - if you have Rust and Node
 

@@ -7,6 +7,15 @@ use magpie::state::AppState;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = Config::parse();
+
+    // Answered before anything is opened or bound, so it works against an
+    // instance that is already running - which is the case that matters, since
+    // the pairing string is usually wanted long after startup scrolled away.
+    if config.connect {
+        println!("{}", config.connect_string());
+        return Ok(());
+    }
+
     init_tracing(&config.log);
     check_startup_safety(&config)?;
 
@@ -15,11 +24,15 @@ async fn main() -> anyhow::Result<()> {
 
     let listener = tokio::net::TcpListener::bind(config.bind).await?;
     tracing::info!(bind = %config.bind, data_dir = %config.data_dir.display(), "magpie listening");
-    if let Some(connect) = config.connect_string() {
+    if config.token.is_some() {
         // Pairing is the one step that needs a value from over here, so print it
         // in the form the options page accepts rather than making people
-        // assemble a URL and a token by hand.
-        tracing::info!("pair the extension by pasting this into its options: {connect}");
+        // assemble a URL and a token by hand. Without a token there is nothing
+        // to pair beyond the address already logged above.
+        tracing::info!(
+            "pair the extension by pasting this into its options: {} (or run `magpie --connect`)",
+            config.connect_string()
+        );
     }
     axum::serve(listener, magpie::app(state)).await?;
     Ok(())

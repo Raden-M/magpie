@@ -95,7 +95,9 @@ unpacked → `extension/dist`**.
 Open the extension's **Options** and set:
 
 - **Backend URL** - `http://127.0.0.1:8787` for a local backend. You can paste the whole connect
-  string the backend prints at startup (`http://host:port#token`) and both fields are filled.
+  string (`http://host:port#token`) and both fields are filled. Magpie prints it at startup when a
+  token is set, and `magpie --connect` prints it any time - or `make connect` against a running
+  container.
 - **Token** - leave empty for a local loopback backend; required for a remote one.
 - **Default shade** - the highlight colour used by the keyboard command / context menu.
 
@@ -136,6 +138,7 @@ Browser ⇢ (extension, token) ⇢ HTTPS ⇢ reverse proxy (TLS) ⇢ 127.0.0.1:8
 
 ```sh
 make docker-up      # generates a token, starts it, prints the connect string
+make connect        # print that string again later
 ```
 
 Or by hand, with `MAGPIE_TOKEN` set in a `.env` (see [`.env.example`](../.env.example)):

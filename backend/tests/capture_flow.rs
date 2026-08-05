@@ -29,6 +29,7 @@ fn test_state_with(tweak: impl FnOnce(&mut Config)) -> (AppState, tempfile::Temp
         allowed_hosts: vec![],
         max_image_bytes: 5_000_000,
         log: "warn".into(),
+        connect: false,
     };
     tweak(&mut config);
     let db = Db::open(dir.path()).unwrap();

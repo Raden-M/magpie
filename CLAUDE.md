@@ -13,6 +13,7 @@ make dev-firefox      # same, but build the Firefox variant into extension/dist-
 make test             # cargo test + npm test
 make build            # release binary + extension
 make docker-up        # run in Docker, generating a token on first start
+make connect          # print the extension pairing string (`magpie --connect`)
 make lint-firefox     # addons-linter over the Firefox build (--self-hosted)
 make licenses         # regenerate THIRD-PARTY.md
 ```

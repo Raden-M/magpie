@@ -5,7 +5,7 @@ export PATH := $(HOME)/.cargo/bin:$(PATH)
 .DEFAULT_GOAL := help
 
 .PHONY: help check-rust check-node dev dev-firefox extension extension-firefox \
-        backend test build docker docker-up docker-down lint-firefox licenses
+        backend test build docker docker-up docker-down connect lint-firefox licenses
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -55,13 +55,16 @@ docker-up: ## Start Magpie in Docker, generating a token on first run
 		printf 'MAGPIE_TOKEN=%s\n' "$$(openssl rand -hex 32)" > .env; \
 		echo "wrote .env with a fresh MAGPIE_TOKEN"; }
 	docker compose up -d
-	@echo
-	@echo "Magpie is at http://127.0.0.1:8787"
-	@echo "Pair the extension by pasting this into its options:"
-	@printf '  http://127.0.0.1:8787#%s\n' "$$(grep '^MAGPIE_TOKEN=' .env | cut -d= -f2)"
+	@$(MAKE) --no-print-directory connect
 
 docker-down: ## Stop the Docker instance (data in ./data is kept)
 	docker compose down
+
+# Asks the running instance rather than reassembling the string here - it knows
+# its own bind address and whether a proxy hostname is configured.
+connect: ## Print the pairing string for the running Docker instance
+	@echo "Pair the extension by pasting this into its options:"
+	@printf '  %s\n' "$$(docker compose exec -T magpie /usr/local/bin/magpie --connect)"
 
 lint-firefox: extension-firefox ## Run Mozilla's own add-on linter over the Firefox build
 	cd extension && npx --yes web-ext lint --source-dir=dist-firefox --self-hosted
