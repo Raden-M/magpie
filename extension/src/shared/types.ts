@@ -1,5 +1,5 @@
-// Wire types shared across the extension, mirroring the backend API
-// (docs/06-api.md). Field names match the JSON exactly.
+// Wire types shared across the extension, mirroring the backend API.
+// Field names match the JSON exactly.
 
 export interface HighlightSelectors {
   quote_exact: string;

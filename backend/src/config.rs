@@ -6,7 +6,7 @@ use clap::Parser;
 /// Runtime configuration, populated from CLI flags or environment variables.
 ///
 /// Every value has a safe local-first default so `magpie` runs with no
-/// configuration at all. See `docs/08-deployment.md` for the remote story.
+/// configuration at all. See `docs/usage.md` for the remote story.
 #[derive(Debug, Clone, Parser)]
 #[command(name = "magpie", version, about = "Self-hosted highlight keeper")]
 pub struct Config {

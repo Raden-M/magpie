@@ -1,0 +1,68 @@
+name: Bug report
+description: Something doesn't work the way it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please don't report security problems here - see [SECURITY.md](https://github.com/Raden-M/magpie/blob/main/SECURITY.md).
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what happened, and what you expected instead.
+    validations:
+      required: true
+
+  - type: input
+    id: page
+    attributes:
+      label: Page URL
+      description: >
+        If this involves capturing, the page matters enormously - reader extraction and highlight
+        anchoring are site-specific, and most interesting failures can't be reproduced without it.
+      placeholder: https://example.com/the-article
+
+  - type: dropdown
+    id: half
+    attributes:
+      label: Which half
+      options:
+        - Extension (capturing)
+        - Backend (reading, searching, the web UI)
+        - Both, or not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Magpie version
+      description: "`magpie --version`, or the release you installed."
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and OS
+      placeholder: Firefox 140, Ubuntu 24.04
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How you run the backend
+      options:
+        - Docker
+        - Binary from a release
+        - From source (make dev)
+        - systemd user unit
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >
+        Backend output, or the extension's console. `MAGPIE_LOG=debug` gets more. Redact your token.
+      render: shell

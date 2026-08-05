@@ -1,19 +1,29 @@
+# `make docker-up` writes a .env with a generated token and starts this.
+# `docker compose up -d` works too, once MAGPIE_TOKEN is set in .env.
 services:
   magpie:
+    # A published release. To build from this checkout instead:
+    #   docker compose build && docker compose up -d
+    image: ghcr.io/raden-m/magpie:${MAGPIE_VERSION:-latest}
     build:
       context: ./backend
-    image: magpie:latest
     restart: unless-stopped
     environment:
+      # Inside a container there is no loopback worth binding to, so Magpie is
+      # reachable from the Docker network and a token is not optional. The
+      # published port below is still limited to this machine.
       MAGPIE_BIND: 0.0.0.0:8787
       MAGPIE_DATA_DIR: /data
-      # Required when bound to a non-loopback address:
-      MAGPIE_TOKEN: ${MAGPIE_TOKEN:?set MAGPIE_TOKEN in a .env file}
-      # Your installed extension's origin, e.g. chrome-extension://<id>
-      MAGPIE_ALLOWED_ORIGINS: ${MAGPIE_ALLOWED_ORIGINS:-}
-      MAGPIE_LOG: info
+      MAGPIE_TOKEN: ${MAGPIE_TOKEN:?set MAGPIE_TOKEN in .env, or run `make docker-up` to generate one}
+      # The public hostname when a reverse proxy fronts this, e.g.
+      # magpie.example.com. Loopback and the bind address are always accepted.
+      MAGPIE_ALLOWED_HOSTS: ${MAGPIE_ALLOWED_HOSTS:-}
+      MAGPIE_LOG: ${MAGPIE_LOG:-info}
     volumes:
+      # SQLite runs in WAL mode, whose locking is unreliable on NFS and SMB.
+      # This must be local storage - back up *from* it, don't run *on* a NAS.
       - ./data:/data
-    # Expose only to your reverse proxy / private network, not the public internet.
+    # Published to this machine only. Put it behind a reverse proxy that
+    # terminates TLS before letting anything else reach it.
     ports:
       - "127.0.0.1:8787:8787"

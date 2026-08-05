@@ -4,6 +4,9 @@
   "description": "Magpie - capture highlighted text from the web into your self-hosted backend.",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=23.6"
+  },
   "scripts": {
     "build": "node build.mjs",
     "build:firefox": "node build.mjs --firefox",

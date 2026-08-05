@@ -3,7 +3,7 @@
 // This MUST stay byte-for-byte identical to the backend's
 // `backend/src/reader/normalize.rs`. Positions (`pos_start`/`pos_end`) and
 // quotes computed here at capture are re-derived by the backend at render; any
-// divergence puts highlights in the wrong place. See docs/04-anchoring.md.
+// divergence puts highlights in the wrong place.
 //
 // The algorithm, over plain text in document order:
 //   1. collapse every run of Unicode whitespace to a single space, and trim;

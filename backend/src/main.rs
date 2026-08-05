@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Fail fast on foot-guns before opening the database (docs/08-deployment.md).
+/// Fail fast on foot-guns before opening the database (see `docs/usage.md`).
 fn check_startup_safety(config: &Config) -> anyhow::Result<()> {
     if !config.is_loopback() && config.token.is_none() {
         anyhow::bail!(

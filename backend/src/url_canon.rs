@@ -1,6 +1,6 @@
-//! URL canonicalization - the grouping key. Mirrors the rules in
-//! docs/03-data-model.md so the server can independently re-validate the
-//! canonical URL the extension computed, never merging across origins.
+//! URL canonicalization - the grouping key. Mirrors the extension's
+//! `shared/url.ts` so the server can independently re-validate the canonical
+//! URL the extension computed, never merging across origins.
 
 use url::Url;
 

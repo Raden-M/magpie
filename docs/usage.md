@@ -24,6 +24,8 @@ cargo build --release
 ./target/release/magpie
 ```
 
+To keep it running across reboots, see [`packaging/`](../packaging/README.md).
+
 ### Configuration
 
 All configuration is environment variables (or flags of the same name); nothing is required for a
@@ -32,43 +34,71 @@ local run.
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `MAGPIE_BIND` | `127.0.0.1:8787` | Listen address. A non-loopback address **requires** a token. |
-| `MAGPIE_DATA_DIR` | `./data` | Where the database, snapshots, and media live. |
-| `MAGPIE_TOKEN` | *(unset)* | Bearer token. Unset **and** loopback ⇒ auth disabled. |
-| `MAGPIE_ALLOWED_ORIGINS` | *(none)* | Comma-separated extension origins allowed via CORS. |
+| `MAGPIE_DATA_DIR` | platform data dir | Where the database, snapshots, and media live. |
+| `MAGPIE_TOKEN` | *(unset)* | Shared secret. Unset **and** loopback ⇒ auth disabled. |
+| `MAGPIE_ALLOWED_HOSTS` | *(none)* | Extra hostnames to answer to, comma separated. Needed behind a reverse proxy. |
+| `MAGPIE_ALLOWED_ORIGINS` | *(none)* | Extension origins allowed via CORS. Rarely needed - the extension asks for host permission instead. |
 | `MAGPIE_MAX_IMAGE_BYTES` | `5000000` | Per-image ceiling accepted at capture. |
 | `MAGPIE_LOG` | `info` | Log level (`error`/`warn`/`info`/`debug`/`trace`). |
+
+`MAGPIE_DATA_DIR` defaults to your platform's data directory - `~/.local/share/magpie` on Linux,
+`~/Library/Application Support/magpie` on macOS, `%APPDATA%\magpie` on Windows. Run
+`magpie --help` to see the resolved path on your machine.
+
+> **Upgrading from a build before this default existed?** The data directory used to be `./data`,
+> resolved against the working directory. If your collection looks empty after upgrading, it is
+> still where you left it:
+>
+> ```sh
+> mkdir -p ~/.local/share/magpie
+> mv backend/data/* ~/.local/share/magpie/
+> ```
 
 ### The data directory
 
 Everything mutable is one directory - copy it to relocate the instance:
 
 ```
-data/
-  magpie.db            # SQLite (+ -wal, -shm)
-  snapshots/<id>.html  # sanitized reader HTML per snapshot version
-  media/<hash>         # content-addressed images
+magpie.db            # SQLite (+ -wal, -shm)
+snapshots/<id>.html  # sanitized reader HTML per snapshot version
+media/<hash>         # content-addressed images
 ```
 
 Startup is idempotent: it creates the schema and directories if missing and migrates forward if
 present, never clobbering existing data. It refuses to start if the data dir isn't writable, or if
 you bind to a non-loopback address without a token.
 
+Migrations are **forward-only**. A newer Magpie will upgrade an older collection on first start; an
+older Magpie meeting a newer collection refuses to start rather than touching it. Keep the version
+you upgraded to.
+
+> **The data directory must be on local storage.** SQLite runs in WAL mode, and WAL locking is
+> unreliable enough on NFS and SMB to corrupt the database. Back up *from* the directory - don't
+> run *on* a network mount.
+
 ## Installing the extension
 
 ```sh
 cd extension
 npm install
-npm run build        # → extension/dist
+npm run build:firefox   # → extension/dist-firefox   (or `npm run build` for Chromium)
 ```
 
-Then, in a Chromium browser: **Extensions → Developer mode → Load unpacked → select
-`extension/dist`**. Open the extension's **Options** and set:
+In Firefox: `about:debugging` → **This Firefox** → **Load Temporary Add-on** → pick any file in
+`extension/dist-firefox`. (A temporary add-on is removed on restart; permanent installs come from
+the signed `.xpi` on Releases.) In a Chromium browser: **Extensions → Developer mode → Load
+unpacked → `extension/dist`**.
 
-- **Backend URL** - `http://127.0.0.1:8787` for a local backend.
+Open the extension's **Options** and set:
+
+- **Backend URL** - `http://127.0.0.1:8787` for a local backend. You can paste the whole connect
+  string the backend prints at startup (`http://host:port#token`) and both fields are filled.
 - **Token** - leave empty for a local loopback backend; required for a remote one.
 - **Default shade** - the highlight colour used by the keyboard command / context menu.
 
-Use **Test connection** to confirm it can reach the backend.
+**Save** asks for permission to reach that backend, and nothing is stored if you decline. Magpie
+requests access to the one address you name rather than to every site, which is why saving is what
+grants it. Use **Test connection** afterwards to confirm.
 
 ### Capturing
 
@@ -92,32 +122,47 @@ Browser ⇢ (extension, token) ⇢ HTTPS ⇢ reverse proxy (TLS) ⇢ 127.0.0.1:8
 ```
 
 1. Run `magpie` bound to loopback or a private interface, with `MAGPIE_TOKEN` set.
-2. Set `MAGPIE_ALLOWED_ORIGINS` to your installed extension's origin, e.g.
-   `chrome-extension://<your-extension-id>`.
-3. Terminate TLS at Caddy/nginx/Traefik and proxy to `127.0.0.1:8787`.
+2. Set `MAGPIE_ALLOWED_HOSTS` to the public hostname, e.g. `magpie.example.com`. Without it Magpie
+   refuses requests carrying that name with `421 Misdirected Request`.
+3. Terminate TLS at Caddy/nginx/Traefik and proxy to `127.0.0.1:8787`, forwarding
+   `X-Forwarded-Proto` so the session cookie is marked `Secure`.
 4. Point the extension's **Backend URL** at `https://magpie.example.com` and set the **Token**.
+5. Open the same URL in a browser and sign in with the token once.
 
 ### Docker
 
 ```sh
-cd backend
-docker build -t magpie:latest .
+make docker-up      # generates a token, starts it, prints the connect string
 ```
 
-Or with the provided compose file from the repo root (set `MAGPIE_TOKEN` in a `.env` first):
+Or by hand, with `MAGPIE_TOKEN` set in a `.env` (see [`.env.example`](../.env.example)):
 
 ```sh
-MAGPIE_TOKEN=$(openssl rand -hex 32) docker compose up -d
+docker compose up -d
 ```
 
-The image is distroless and serves a mounted `./data` volume.
+The image is distroless and serves a mounted `./data` volume. Inside a container there is no
+loopback worth binding to, so a token is always required; the published port is limited to
+`127.0.0.1`.
 
 ## Security posture
 
-- **Auth**: a single bearer token, compared in constant time. Enforced on everything except
-  `/healthz` and static assets whenever a token is set (or the bind is non-loopback). Browsers can't
-  send a bearer header on navigation, so protect remote **human** access to the web UI at the reverse
-  proxy (basic auth, VPN, or IP allowlist); the token guards the extension's API path.
+- **Auth** is a single shared secret in two shapes. The extension sends it as a bearer token on
+  every API call. Browsers can't attach a bearer header to ordinary navigation, so they exchange it
+  once at `/login` for a session cookie (`HttpOnly`, `SameSite=Strict`, and `Secure` when the
+  request arrived over HTTPS). The cookie carries a key minted at startup, never the token itself,
+  so nothing durable is stored in the browser and restarting Magpie signs every browser out. Both
+  are compared in constant time. Everything is behind it except `/healthz`, `/login` and static
+  assets.
+- **Host allowlist.** Binding to loopback doesn't make Magpie unreachable: every page you visit can
+  issue requests to `127.0.0.1`, and DNS rebinding defeats CORS outright by making the response
+  same-origin. Requests must carry a `Host` we answer to - loopback, the bind address, or
+  `MAGPIE_ALLOWED_HOSTS` - and anything else gets `421`.
+- **Known residual risk.** A page you visit can still fire a cross-origin `POST /api/captures` at a
+  genuinely local address. `multipart/form-data` is a CORS-safelisted content type, so it is a
+  simple request needing no preflight, and it carries a legitimate `Host`. The response stays
+  hidden, so this is write-only nuisance rather than disclosure - but a hostile page can put junk in
+  your collection on an instance with auth off. Setting a token closes it.
 - **CSP on served snapshots**: the reader view is served under a strict `Content-Security-Policy`
   (`default-src 'none'`, no inline scripts) even though captures are sanitized at capture time. A
   stored snapshot can never execute script or load remote resources. Defense in depth - the backend

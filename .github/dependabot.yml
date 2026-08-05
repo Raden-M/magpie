@@ -1,0 +1,32 @@
+version: 2
+updates:
+  # Rust dependencies are compiled into the distributed binary, and npm ones are
+  # bundled into a content script that runs on every page - so both are worth
+  # watching. Grouped so a quiet week is one PR, not fifteen.
+  - package-ecosystem: cargo
+    directory: /backend
+    schedule:
+      interval: weekly
+    groups:
+      backend:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: npm
+    directory: /extension
+    schedule:
+      interval: weekly
+    groups:
+      extension:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: monthly

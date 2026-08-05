@@ -1,5 +1,5 @@
 //! Re-location: given a snapshot's normalized text and a highlight's selectors,
-//! find the character range. The ladder (docs/04-anchoring.md), first match wins:
+//! find the character range. The ladder, first match wins:
 //!
 //!   1. position fast-path - the offsets captured against this snapshot;
 //!   2. exact quote search, disambiguated by prefix/suffix and nearest offset;

@@ -5,7 +5,7 @@ use serde::Serialize;
 
 /// The single error type crossing the API boundary. Every fallible handler
 /// returns `AppResult<_>`; the `IntoResponse` impl renders the shape
-/// `{ "error": { "code", "message" } }` documented in `docs/06-api.md`.
+/// `{ "error": { "code", "message" } }` that every API route answers with.
 #[derive(Debug)]
 pub enum AppError {
     NotFound(String),

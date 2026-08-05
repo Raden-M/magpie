@@ -4,7 +4,7 @@
  * (blue -> teal -> purple) belongs to the highlights: those stops are the shade
  * a capture was saved with, so they answer to the data, not to taste. The brand
  * blue is identity - mark, wordmark, and the UI states that echo them. Both
- * themes are first-class. See docs/07-design-system.md. */
+ * themes are first-class. */
 
 :root {
   /* Iridescence - the accent, used only for highlights / active states. */

@@ -1,0 +1,38 @@
+[Unit]
+Description=Magpie - self-hosted highlight keeper
+Documentation=https://github.com/Raden-M/magpie
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/magpie
+Restart=always
+RestartSec=2
+
+# Deliberately sets no MAGPIE_DATA_DIR. The binary's own default - the platform
+# data directory - is the single source of truth for where the collection lives,
+# and duplicating it here is how the two drift apart.
+#
+# For a remote instance, put MAGPIE_BIND / MAGPIE_TOKEN in the override file
+# rather than editing this one:
+#   systemctl --user edit magpie
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+# SQLite runs in WAL mode, so it must create sibling -wal and -shm files. Under
+# ProtectSystem=strict an unwritable data directory fails at startup, not later.
+ReadWritePaths=%h/.local/share/magpie
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=default.target
