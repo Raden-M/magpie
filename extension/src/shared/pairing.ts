@@ -42,11 +42,16 @@ export function parseConnectString(value: string): Pairing {
  * The pattern is per-origin rather than the wildcards the manifest declares as
  * optional: the extension only ever needs to reach the one server it is paired
  * with, and a narrow grant is what the permission prompt should say.
+ *
+ * Also null for an IPv6 literal: the match-pattern grammar has no bracketed
+ * host, so `http://[::1]:8787/*` is not a pattern a browser will accept. Better
+ * to say so than to hand `permissions.request` something it throws on.
  */
 export function originPatternFor(url: string): string | null {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    if (parsed.hostname.startsWith("[")) return null;
     return `${parsed.protocol}//${parsed.host}/*`;
   } catch {
     return null;

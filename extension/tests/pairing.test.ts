@@ -31,3 +31,10 @@ test("anything unparseable or non-http asks for no permission", () => {
     assert.equal(originPatternFor(value), null, value);
   }
 });
+
+test("an IPv6 literal has no match pattern, so it asks for nothing", () => {
+  // `http://[::1]:8787/*` is not a grammar the browser accepts; returning null
+  // is what lets the options page explain that rather than throw.
+  assert.equal(originPatternFor("http://[::1]:8787"), null);
+  assert.equal(originPatternFor("http://[2001:db8::1]"), null);
+});

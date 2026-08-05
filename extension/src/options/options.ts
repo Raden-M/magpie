@@ -39,10 +39,15 @@ async function load(): Promise<void> {
  *
  * Called before anything is awaited: Firefox only honours a permission request
  * still tied to the click that started it.
+ *
+ * Rejects rather than resolving false when the browser won't take the pattern
+ * at all - an IPv6 literal has no match-pattern spelling, for one - so the
+ * caller can say which of the two happened instead of blaming the user for
+ * declining a prompt they were never shown.
  */
 function requestAccess(url: string): Promise<boolean> {
   const origin = originPatternFor(url);
-  if (!origin) return Promise.resolve(false);
+  if (!origin) return Promise.reject(new Error(`unusable origin: ${url}`));
   // Resolves true immediately when the permission is already held.
   return ext.permissions.request({ origins: [origin] });
 }
@@ -63,7 +68,16 @@ async function save(): Promise<void> {
   backendUrl.value = pairing.backendUrl;
   if (pairing.token) token.value = pairing.token;
 
-  const granted = await requestAccess(pairing.backendUrl);
+  let granted: boolean;
+  try {
+    granted = await requestAccess(pairing.backendUrl);
+  } catch {
+    setStatus(
+      "This browser can't grant access to that address. Use a hostname or an IPv4 address.",
+      "error",
+    );
+    return;
+  }
   if (!granted) {
     setStatus("Magpie needs permission to reach that backend. Nothing saved.", "error");
     return;
