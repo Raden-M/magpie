@@ -1,6 +1,6 @@
 // Reader-view extraction. Runs Readability on a *clone* of the document (it
 // mutates its input), then sanitizes it. Falls back to a selection-scoped
-// capture so a highlight is never lost on a non-article page (docs/05, step 2).
+// capture so a highlight is never lost on a non-article page.
 // Block ids and the final HTML are assigned by the caller *after* images are
 // stored and the content is decluttered, so they reflect what's really kept.
 

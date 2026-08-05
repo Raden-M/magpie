@@ -14,7 +14,7 @@ texts alongside it as `THIRD-PARTY.txt`, written at build time.
 
 | Package | Version | License |
 | --- | --- | --- |
-| [@mozilla/readability](https://github.com/mozilla/readability) | 0.5.0 | Apache-2.0 |
+| [@mozilla/readability](https://github.com/mozilla/readability) | 0.6.0 | Apache-2.0 |
 | [dompurify](https://github.com/cure53/DOMPurify) | 3.4.12 | (MPL-2.0 OR Apache-2.0) |
 
 Full texts ship in `THIRD-PARTY.txt` in every extension build.
