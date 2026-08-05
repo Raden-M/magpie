@@ -581,7 +581,10 @@ async fn the_right_token_trades_for_a_session_that_opens_the_collection() {
     assert_eq!(response.status(), StatusCode::SEE_OTHER);
     let cookie = response.headers()[header::SET_COOKIE].to_str().unwrap();
     assert!(cookie.contains("HttpOnly"), "not readable from script");
-    assert!(cookie.contains("SameSite=Strict"), "not sent cross-site");
+    assert!(
+        cookie.contains("SameSite=Lax"),
+        "withheld on cross-site writes, kept for following a link in"
+    );
     assert!(
         !cookie.contains("s3cret"),
         "the token itself never reaches the browser"
@@ -659,6 +662,61 @@ async fn rotating_the_token_signs_every_browser_out() {
         StatusCode::SEE_OTHER,
         "rotating the token sends the old cookie back to the login form"
     );
+}
+
+#[tokio::test]
+async fn signing_in_returns_to_the_page_that_was_asked_for() {
+    let (state, _dir) = locked_state();
+    let app = magpie::app(state);
+
+    // A link straight to one highlight, followed while signed out.
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/reader/abc?full=1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    assert_eq!(
+        response.headers()[header::LOCATION],
+        "/login?next=%2Freader%2Fabc%3Ffull%3D1",
+        "the destination survives the detour through the form"
+    );
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/login")
+                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .body(Body::from("token=s3cret&next=%2Freader%2Fabc%3Ffull%3D1"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    assert_eq!(response.headers()[header::LOCATION], "/reader/abc?full=1");
+
+    // An off-site destination is not a destination.
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/login")
+                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .body(Body::from(
+                    "token=s3cret&next=https%3A%2F%2Fevil.example.com",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.headers()[header::LOCATION], "/");
 }
 
 #[tokio::test]

@@ -56,6 +56,57 @@ pub(crate) fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     diff == 0
 }
 
+/// A caller-supplied redirect target, reduced to something that can only point
+/// back into this instance.
+///
+/// Anything that isn't a plain absolute path becomes `/`. A protocol-relative
+/// `//evil.example.com` is a URL, not a path; a backslash is normalised to `/`
+/// by several browsers, so `/\evil.example.com` is the same trick spelled
+/// differently; and a control character could split the `Location` header.
+pub(crate) fn safe_next_path(next: Option<&str>) -> String {
+    const HOME: &str = "/";
+
+    let Some(candidate) = next.map(str::trim) else {
+        return HOME.to_string();
+    };
+
+    let is_local = candidate.starts_with('/')
+        && !candidate.starts_with("//")
+        && !candidate.contains('\\')
+        && !candidate.chars().any(char::is_control);
+
+    if is_local {
+        candidate.to_string()
+    } else {
+        HOME.to_string()
+    }
+}
+
+/// `/login`, carrying where the visitor was actually trying to go.
+///
+/// Without this, every arrival at a deep link is answered with the collection
+/// root once signed in, which is worst exactly when it matters: a link straight
+/// to one highlight.
+fn login_target(req: &Request) -> String {
+    if req.method() != Method::GET {
+        return "/login".to_string();
+    }
+
+    let wanted = req
+        .uri()
+        .path_and_query()
+        .map(|pq| pq.as_str())
+        .unwrap_or("/");
+    if wanted == "/" || safe_next_path(Some(wanted)) != wanted {
+        return "/login".to_string();
+    }
+
+    let query = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair("next", wanted)
+        .finish();
+    format!("/login?{query}")
+}
+
 pub async fn require_auth(State(state): State<AppState>, req: Request, next: Next) -> Response {
     if !state.config.auth_required() || is_exempt(req.uri().path()) {
         return next.run(req).await;
@@ -87,7 +138,7 @@ pub async fn require_auth(State(state): State<AppState>, req: Request, next: Nex
     if req.uri().path().starts_with("/api/") {
         AppError::Unauthorized.into_response()
     } else {
-        Redirect::to("/login").into_response()
+        Redirect::to(&login_target(&req)).into_response()
     }
 }
 
@@ -109,5 +160,58 @@ pub fn cors_layer(origins: &[String]) -> CorsLayer {
         layer
     } else {
         layer.allow_origin(AllowOrigin::list(parsed))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_next_path_can_only_point_back_at_us() {
+        assert_eq!(
+            safe_next_path(Some("/reader/abc?full=1")),
+            "/reader/abc?full=1"
+        );
+        assert_eq!(safe_next_path(Some("/")), "/");
+
+        for hostile in [
+            "//evil.example.com",
+            "/\\evil.example.com",
+            "https://evil.example.com",
+            "javascript:alert(1)",
+            "reader/abc",
+            "/reader\r\nSet-Cookie: x=y",
+        ] {
+            assert_eq!(
+                safe_next_path(Some(hostile)),
+                "/",
+                "{hostile} must not survive"
+            );
+        }
+
+        assert_eq!(safe_next_path(None), "/");
+    }
+
+    #[test]
+    fn the_login_redirect_carries_a_deep_link_but_not_the_root() {
+        let target = |uri: &str| {
+            login_target(
+                &Request::builder()
+                    .uri(uri)
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+        };
+
+        assert_eq!(
+            target("/reader/abc?full=1"),
+            "/login?next=%2Freader%2Fabc%3Ffull%3D1"
+        );
+        assert_eq!(
+            target("/"),
+            "/login",
+            "the root is where login lands anyway"
+        );
     }
 }

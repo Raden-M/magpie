@@ -7,20 +7,28 @@
 //! session cookie carrying [`AppState::session`] - never the token itself, so
 //! what sits in the browser cannot be replayed against the API.
 
-use axum::extract::{Form, State};
+use axum::extract::{Form, Query, State};
 use axum::http::StatusCode;
 use axum::http::header::{self, HeaderMap};
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use maud::{DOCTYPE, Markup, html};
 use serde::Deserialize;
 
-use crate::api::auth::{SESSION_COOKIE, constant_time_eq};
+use crate::api::auth::{SESSION_COOKIE, constant_time_eq, safe_next_path};
 use crate::state::AppState;
 use crate::web::{PAGE_CSP, layout};
 
 #[derive(Deserialize)]
 pub struct LoginForm {
     token: String,
+    #[serde(default)]
+    next: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct LoginQuery {
+    #[serde(default)]
+    next: Option<String>,
 }
 
 /// Whether the browser reached us over TLS - directly, or through a proxy that
@@ -38,11 +46,11 @@ fn is_secure_request(headers: &HeaderMap) -> bool {
         })
 }
 
-pub async fn form(State(state): State<AppState>) -> Response {
+pub async fn form(State(state): State<AppState>, Query(query): Query<LoginQuery>) -> Response {
     if !state.config.auth_required() {
         return Redirect::to("/").into_response();
     }
-    page(None).into_response()
+    page(None, safe_next_path(query.next.as_deref())).into_response()
 }
 
 pub async fn submit(
@@ -54,6 +62,8 @@ pub async fn submit(
         return Redirect::to("/").into_response();
     }
 
+    let destination = safe_next_path(input.next.as_deref());
+
     // Checked before the token is even compared, so a lockout cannot be
     // sidestepped and the comparison isn't a timing oracle under load.
     if let Some(wait) = state.throttle().retry_after() {
@@ -61,7 +71,10 @@ pub async fn submit(
         return (
             StatusCode::TOO_MANY_REQUESTS,
             [(header::RETRY_AFTER, seconds.to_string())],
-            page(Some("Too many wrong tokens. Wait a moment and try again.")),
+            page(
+                Some("Too many wrong tokens. Wait a moment and try again."),
+                destination,
+            ),
         )
             .into_response();
     }
@@ -72,35 +85,41 @@ pub async fn submit(
         state.throttle().record_failure();
         return (
             StatusCode::UNAUTHORIZED,
-            page(Some(
-                "That token doesn't match. Check the extension's options.",
-            )),
+            page(
+                Some("That token doesn't match. Check the extension's options."),
+                destination,
+            ),
         )
             .into_response();
     }
 
     state.throttle().record_success();
 
+    // `Lax`, not `Strict`. Strict withholds the cookie on any cross-site
+    // navigation, so following a link to a highlight from anywhere else lands
+    // an already-signed-in owner back on this form, having lost where they were
+    // going. Lax still withholds it on every cross-site *non-GET* request,
+    // which is what the CSRF argument in `host_guard` actually rests on.
     let mut cookie = format!(
-        "{SESSION_COOKIE}={}; HttpOnly; SameSite=Strict; Path=/",
+        "{SESSION_COOKIE}={}; HttpOnly; SameSite=Lax; Path=/",
         state.session
     );
     if is_secure_request(&headers) {
         cookie.push_str("; Secure");
     }
 
-    ([(header::SET_COOKIE, cookie)], Redirect::to("/")).into_response()
+    ([(header::SET_COOKIE, cookie)], Redirect::to(&destination)).into_response()
 }
 
-fn page(error: Option<&str>) -> Response {
+fn page(error: Option<&str>, next: String) -> Response {
     (
         [(header::CONTENT_SECURITY_POLICY, PAGE_CSP)],
-        Html(render(error).into_string()),
+        Html(render(error, &next).into_string()),
     )
         .into_response()
 }
 
-fn render(error: Option<&str>) -> Markup {
+fn render(error: Option<&str>, next: &str) -> Markup {
     html! {
         (DOCTYPE)
         html lang="en" {
@@ -120,6 +139,7 @@ fn render(error: Option<&str>) -> Markup {
                         "and it'll remember this browser."
                     }
                     form class="login-form" method="post" action="/login" {
+                        input type="hidden" name="next" value=(next);
                         label class="login-label" for="token" { "Token" }
                         input class="login-input" id="token" name="token" type="password"
                               autocomplete="current-password" autofocus spellcheck="false"
