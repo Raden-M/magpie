@@ -49,48 +49,59 @@ own - the same artifact either way, no account, no cloud, no telemetry.
 
 ## Quick start
 
-Pick whichever half you'd rather not think about.
+Two steps: run the backend, then install the extension.
 
-### Docker - nothing to install but Docker
+### 1. Run the backend
+
+**With Docker** - no Rust toolchain needed:
 
 ```sh
 make docker-up
 ```
 
-Generates a token, starts Magpie on <http://127.0.0.1:8787>, and prints a connect string to paste
-into the extension. Re-running it keeps the token you already have, and `make connect` prints that
-string again whenever you need it.
+Generates a token, starts Magpie on <http://127.0.0.1:8787>, and prints a connect string. Re-running
+it keeps the token you already have, and `make connect` prints that string again whenever you need
+it.
 
-### From source - if you have Rust and Node
+**From source** - if you have Rust:
 
 ```sh
-make dev
+make backend
 ```
 
-Builds the extension and serves <http://127.0.0.1:8787>. On loopback with no token auth is off, so
-that URL is your collection straight away. Use `make dev-firefox` to build the Firefox variant
-instead. You'll need Rust and Node >= 23.6; `make` checks both before it starts.
+Serves <http://127.0.0.1:8787>. On loopback with no token auth is off, so that URL is your
+collection straight away - no token, no pairing string, nothing to paste.
 
-### Then install the extension
+### 2. Build and install the extension
 
-**Firefox** is the supported target. Until the first signed release, load it from a checkout:
-`about:debugging` → **This Firefox** → **Load Temporary Add-on** → pick any file in
-`extension/dist-firefox`. Signed `.xpi` builds that install permanently and auto-update will be
-published to [Releases](https://github.com/Raden-M/magpie/releases).
+Until the first signed release lands you build this yourself, so **Node >= 23.6 is required either
+way** - including the Docker route. `make dev` does the backend and the extension together if you
+want both from source.
 
-**Chromium** works but isn't a shipping target yet: `chrome://extensions` → **Developer mode** →
-**Load unpacked** → `extension/dist`. See
-[the decision record](docs/decisions/2026-08-05-chrome-web-store-deferred.md).
+```sh
+make extension-firefox      # → extension/dist-firefox
+```
 
-Then open the extension's options, paste the connect string (or just the backend URL for a local,
-tokenless setup), and **Save**. Saving asks permission to reach that one address - Magpie requests
-access per-backend rather than up front, so it works wherever you host it.
+In Firefox: `about:debugging` → **This Firefox** → **Load Temporary Add-on** → pick any file in
+`extension/dist-firefox`.
+
+Then **click the Magpie icon in the toolbar** - that opens its settings. Paste the connect string
+into **Backend URL** (it fills the token too), or just `http://127.0.0.1:8787` if you're running
+without a token, and hit **Save**. Saving asks permission to reach that one address, which is how
+Magpie works with a backend hosted anywhere.
 
 Highlight something.
 
-### Keeping it running
+### Notes
 
-`make dev` is a foreground process. To have Magpie always there, see
+A temporary add-on is removed when Firefox restarts. Signed `.xpi` builds that install permanently
+and auto-update will be published to [Releases](https://github.com/Raden-M/magpie/releases).
+
+**Chromium** works but isn't a shipping target yet: `make extension`, then `chrome://extensions` →
+**Developer mode** → **Load unpacked** → `extension/dist`. See
+[the decision record](docs/decisions/2026-08-05-chrome-web-store-deferred.md).
+
+To keep Magpie running rather than holding a terminal open, see
 [`packaging/`](packaging/README.md) for the systemd user unit, or leave the Docker instance up.
 
 ## How it works

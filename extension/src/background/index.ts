@@ -21,6 +21,14 @@ ext.runtime.onInstalled.addListener(() => {
   });
 });
 
+// Capturing has three ways in - the pill, the context menu, the keyboard - and
+// settings had none. The toolbar icon carries no popup, so without this it is a
+// button that does nothing, and pairing is buried under about:addons where
+// nobody would find it.
+ext.action.onClicked.addListener(() => {
+  void ext.runtime.openOptionsPage();
+});
+
 ext.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === CONTEXT_MENU_ID && tab?.id !== undefined) {
     void ext.tabs.sendMessage(tab.id, { type: TRIGGER_CAPTURE });

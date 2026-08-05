@@ -24,7 +24,7 @@
     "128": "icons/magpie-128.png"
   },
   "action": {
-    "default_title": "Magpie",
+    "default_title": "Magpie - settings",
     "default_icon": {
       "16": "icons/magpie-16.png",
       "32": "icons/magpie-32.png",

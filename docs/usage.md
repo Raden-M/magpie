@@ -92,7 +92,8 @@ In Firefox: `about:debugging` → **This Firefox** → **Load Temporary Add-on**
 the signed `.xpi` on Releases.) In a Chromium browser: **Extensions → Developer mode → Load
 unpacked → `extension/dist`**.
 
-Open the extension's **Options** and set:
+**Click the Magpie icon in the toolbar** to open its settings - the icon has no popup, so that click
+is what opens them. (`about:addons` → Magpie → Preferences works too.) Set:
 
 - **Backend URL** - `http://127.0.0.1:8787` for a local backend. You can paste the whole connect
   string (`http://host:port#token`) and both fields are filled. Magpie prints it at startup when a
