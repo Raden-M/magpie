@@ -8,6 +8,7 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
 use crate::config::Config;
 use crate::db::Db;
+use crate::util::hmac_sha256;
 
 /// Where the browser session key is kept, inside the data directory.
 const SESSION_KEY_FILE: &str = "session.key";
@@ -19,19 +20,33 @@ pub struct AppState {
     /// The value a browser session cookie must carry - never the configured
     /// token, so nothing durable enough to reach the API is left in a browser.
     ///
-    /// Persisted beside the collection, so restarting doesn't sign everyone out.
+    /// Derived from the stored key *and* the token, so the two credentials are
+    /// genuinely one secret: rotating `MAGPIE_TOKEN` changes this value and
+    /// every outstanding cookie stops matching. Restarting on an unchanged
+    /// token reproduces it exactly, so browsers stay signed in.
     pub session: Arc<String>,
 }
 
 impl AppState {
     pub fn new(db: Db, config: Config) -> Self {
-        let session = load_or_create_session_key(&config.data_dir);
+        let key = load_or_create_session_key(&config.data_dir);
+        let session = derive_session_value(&key, config.token.as_deref());
         AppState {
             db,
             config: Arc::new(config),
             session: Arc::new(session),
         }
     }
+}
+
+/// The cookie value for a given key and token.
+///
+/// Keyed on the stored secret and covering the token, so it cannot be computed
+/// without the file and cannot survive the token changing. A missing token
+/// still derives a value - auth is off in that case, so nothing consults it.
+fn derive_session_value(key: &str, token: Option<&str>) -> String {
+    let mac = hmac_sha256(key.as_bytes(), token.unwrap_or_default().as_bytes());
+    URL_SAFE_NO_PAD.encode(mac)
 }
 
 /// 32 bytes from the OS, URL-safe so it needs no cookie quoting.
@@ -85,16 +100,28 @@ fn load_or_create_session_key(data_dir: &Path) -> String {
 }
 
 /// Write owner-only where the platform has a notion of it.
+///
+/// Replaces rather than truncates, because only a *newly created* file can be
+/// opened with its mode already set. Writing into an existing one would leave
+/// the key readable at whatever the umask allows - usually world-readable -
+/// for the moment between the write and the chmod.
 fn write_private(path: &Path, contents: &str) -> std::io::Result<()> {
-    std::fs::write(path, contents)?;
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+    match std::fs::remove_file(path) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e),
     }
 
-    Ok(())
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+
+    let mut file = options.open(path)?;
+    std::io::Write::write_all(&mut file, contents.as_bytes())
 }
 
 #[cfg(test)]
@@ -120,6 +147,28 @@ mod tests {
         assert_ne!(first, load_or_create_session_key(elsewhere.path()));
     }
 
+    #[test]
+    fn rotating_the_token_invalidates_outstanding_cookies() {
+        let key = new_session_key();
+        let before = derive_session_value(&key, Some("s3cret"));
+
+        assert_eq!(
+            before,
+            derive_session_value(&key, Some("s3cret")),
+            "an unchanged token keeps browsers signed in across a restart"
+        );
+        assert_ne!(
+            before,
+            derive_session_value(&key, Some("rotated")),
+            "changing the token signs every browser out"
+        );
+        assert_ne!(
+            before,
+            derive_session_value(&new_session_key(), Some("s3cret")),
+            "the stored key is still required to compute it"
+        );
+    }
+
     #[cfg(unix)]
     #[test]
     fn the_session_key_is_written_owner_only() {
@@ -132,6 +181,27 @@ mod tests {
             .permissions()
             .mode();
         assert_eq!(mode & 0o777, 0o600);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn replacing_a_world_readable_key_file_tightens_it() {
+        use std::os::unix::fs::PermissionsExt;
+
+        // What an older Magpie, or a stray `echo >`, could have left behind.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(SESSION_KEY_FILE);
+        std::fs::write(&path, "").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+        load_or_create_session_key(dir.path());
+
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(
+            mode & 0o777,
+            0o600,
+            "the empty file is replaced, not filled"
+        );
     }
 
     #[test]

@@ -603,6 +603,65 @@ async fn the_right_token_trades_for_a_session_that_opens_the_collection() {
 }
 
 #[tokio::test]
+async fn rotating_the_token_signs_every_browser_out() {
+    let dir = tempfile::tempdir().unwrap();
+
+    // One collection, opened twice with different tokens - a restart after the
+    // operator rotated a leaked secret.
+    let state_with = |token: &str| {
+        let mut config = Config {
+            bind: "127.0.0.1:0".parse().unwrap(),
+            data_dir: dir.path().to_path_buf(),
+            token: Some(token.into()),
+            allowed_origins: vec![],
+            allowed_hosts: vec![],
+            public_url: None,
+            max_image_bytes: 5_000_000,
+            log: "warn".into(),
+            connect: false,
+        };
+        config.token = Some(token.into());
+        AppState::new(Db::open(dir.path()).unwrap(), config)
+    };
+
+    let before = state_with("s3cret");
+    let cookie = format!("magpie_session={}", before.session);
+
+    let open = |state: AppState, cookie: String| {
+        magpie::app(state).oneshot(
+            Request::builder()
+                .uri("/")
+                .header(header::COOKIE, cookie)
+                .body(Body::empty())
+                .unwrap(),
+        )
+    };
+
+    let response = open(before.clone(), cookie.clone()).await.unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "the session works while the token is unchanged"
+    );
+
+    let restarted = state_with("s3cret");
+    let response = open(restarted, cookie.clone()).await.unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "an ordinary restart keeps browsers signed in"
+    );
+
+    let rotated = state_with("rotated");
+    let response = open(rotated, cookie).await.unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::SEE_OTHER,
+        "rotating the token sends the old cookie back to the login form"
+    );
+}
+
+#[tokio::test]
 async fn a_lan_address_reaches_an_instance_that_named_no_hostname() {
     // Bound to everything, as a container or a LAN service is, with nothing in
     // the allowlist. Reaching it by address must not need configuration first.
