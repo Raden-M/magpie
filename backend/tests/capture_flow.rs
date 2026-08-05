@@ -2,8 +2,6 @@
 //! `oneshot`. Covers the normalization round-trip (a highlight captured with
 //! position offsets must bake onto the exact quote at render) and idempotency.
 
-use std::sync::Arc;
-
 use axum::body::{Body, to_bytes};
 use axum::http::{Request, StatusCode, header};
 use magpie::config::Config;
@@ -16,23 +14,27 @@ use tower::ServiceExt;
 const BOUNDARY: &str = "MAGPIEBOUNDARY";
 
 fn test_state() -> (AppState, tempfile::TempDir) {
+    test_state_with(|_| {})
+}
+
+/// A state whose config can be adjusted before the app is built - auth and the
+/// host allowlist are configured, so they can only be exercised this way.
+fn test_state_with(tweak: impl FnOnce(&mut Config)) -> (AppState, tempfile::TempDir) {
     let dir = tempfile::tempdir().unwrap();
-    let config = Config {
+    let mut config = Config {
         bind: "127.0.0.1:0".parse().unwrap(),
         data_dir: dir.path().to_path_buf(),
         token: None,
         allowed_origins: vec![],
+        allowed_hosts: vec![],
+        public_url: None,
         max_image_bytes: 5_000_000,
         log: "warn".into(),
+        connect: false,
     };
+    tweak(&mut config);
     let db = Db::open(dir.path()).unwrap();
-    (
-        AppState {
-            db,
-            config: Arc::new(config),
-        },
-        dir,
-    )
+    (AppState::new(db, config), dir)
 }
 
 fn multipart_capture(payload: &Value) -> Body {
@@ -444,5 +446,377 @@ async fn reader_defaults_to_snippets_with_a_live_link_and_a_full_backup() {
     assert!(
         html.contains("over the lazy dog"),
         "full view keeps text outside the highlight's snippet"
+    );
+}
+
+/// A locked instance: the token is what the extension would send.
+fn locked_state() -> (AppState, tempfile::TempDir) {
+    test_state_with(|c| c.token = Some("s3cret".into()))
+}
+
+#[tokio::test]
+async fn foreign_host_is_refused_before_anything_else() {
+    let (state, _dir) = test_state();
+    let app = magpie::app(state);
+
+    // The shape of a DNS-rebinding request: the attacker's name, our address.
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/")
+                .header(header::HOST, "evil.example.com")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::MISDIRECTED_REQUEST,
+        "a hostname we don't answer to is refused"
+    );
+
+    for host in ["127.0.0.1:8787", "localhost", "[::1]:8787"] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/")
+                    .header(header::HOST, host)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK, "{host} reaches the app");
+    }
+}
+
+#[tokio::test]
+async fn a_proxy_hostname_is_reachable_once_allowed() {
+    let (state, _dir) = test_state_with(|c| c.allowed_hosts = vec!["magpie.example.com".into()]);
+    let app = magpie::app(state);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/")
+                .header(header::HOST, "magpie.example.com")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn locked_instance_redirects_browsers_but_keeps_json_for_the_api() {
+    let (state, _dir) = locked_state();
+    let app = magpie::app(state);
+
+    // A browser navigating with no credentials is sent to the form, not handed
+    // JSON it would render as text.
+    let response = app
+        .clone()
+        .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    assert_eq!(response.headers()[header::LOCATION], "/login");
+
+    // The extension's path keeps the JSON 401 its error handling reads.
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/pages")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(body_json(response).await["error"]["code"], "unauthorized");
+
+    // The form itself must stay reachable, or there is no way in.
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/login")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn the_right_token_trades_for_a_session_that_opens_the_collection() {
+    let (state, _dir) = locked_state();
+    let app = magpie::app(state);
+
+    let post_login = |body: &'static str| {
+        app.clone().oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/login")
+                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .body(Body::from(body))
+                .unwrap(),
+        )
+    };
+
+    let response = post_login("token=wrong").await.unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::UNAUTHORIZED,
+        "a wrong token mints no session"
+    );
+    assert!(response.headers().get(header::SET_COOKIE).is_none());
+
+    let response = post_login("token=s3cret").await.unwrap();
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    let cookie = response.headers()[header::SET_COOKIE].to_str().unwrap();
+    assert!(cookie.contains("HttpOnly"), "not readable from script");
+    assert!(
+        cookie.contains("SameSite=Lax"),
+        "withheld on cross-site writes, kept for following a link in"
+    );
+    assert!(
+        !cookie.contains("s3cret"),
+        "the token itself never reaches the browser"
+    );
+
+    // The session it just handed out opens the collection.
+    let session = cookie.split(';').next().unwrap().to_string();
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/")
+                .header(header::COOKIE, session)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn rotating_the_token_signs_every_browser_out() {
+    let dir = tempfile::tempdir().unwrap();
+
+    // One collection, opened twice with different tokens - a restart after the
+    // operator rotated a leaked secret.
+    let state_with = |token: &str| {
+        let mut config = Config {
+            bind: "127.0.0.1:0".parse().unwrap(),
+            data_dir: dir.path().to_path_buf(),
+            token: Some(token.into()),
+            allowed_origins: vec![],
+            allowed_hosts: vec![],
+            public_url: None,
+            max_image_bytes: 5_000_000,
+            log: "warn".into(),
+            connect: false,
+        };
+        config.token = Some(token.into());
+        AppState::new(Db::open(dir.path()).unwrap(), config)
+    };
+
+    let before = state_with("s3cret");
+    let cookie = format!("magpie_session={}", before.session);
+
+    let open = |state: AppState, cookie: String| {
+        magpie::app(state).oneshot(
+            Request::builder()
+                .uri("/")
+                .header(header::COOKIE, cookie)
+                .body(Body::empty())
+                .unwrap(),
+        )
+    };
+
+    let response = open(before.clone(), cookie.clone()).await.unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "the session works while the token is unchanged"
+    );
+
+    let restarted = state_with("s3cret");
+    let response = open(restarted, cookie.clone()).await.unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "an ordinary restart keeps browsers signed in"
+    );
+
+    let rotated = state_with("rotated");
+    let response = open(rotated, cookie).await.unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::SEE_OTHER,
+        "rotating the token sends the old cookie back to the login form"
+    );
+}
+
+#[tokio::test]
+async fn signing_in_returns_to_the_page_that_was_asked_for() {
+    let (state, _dir) = locked_state();
+    let app = magpie::app(state);
+
+    // A link straight to one highlight, followed while signed out.
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/reader/abc?full=1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    assert_eq!(
+        response.headers()[header::LOCATION],
+        "/login?next=%2Freader%2Fabc%3Ffull%3D1",
+        "the destination survives the detour through the form"
+    );
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/login")
+                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .body(Body::from("token=s3cret&next=%2Freader%2Fabc%3Ffull%3D1"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    assert_eq!(response.headers()[header::LOCATION], "/reader/abc?full=1");
+
+    // An off-site destination is not a destination.
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/login")
+                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .body(Body::from(
+                    "token=s3cret&next=https%3A%2F%2Fevil.example.com",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.headers()[header::LOCATION], "/");
+}
+
+#[tokio::test]
+async fn guessing_the_token_is_throttled() {
+    let (state, _dir) = locked_state();
+    let app = magpie::app(state);
+
+    let guess = |body: &'static str| {
+        app.clone().oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/login")
+                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .body(Body::from(body))
+                .unwrap(),
+        )
+    };
+
+    // A handful of typos still get a straight answer.
+    for _ in 0..5 {
+        assert_eq!(
+            guess("token=wrong").await.unwrap().status(),
+            StatusCode::UNAUTHORIZED
+        );
+    }
+
+    let response = guess("token=wrong").await.unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::TOO_MANY_REQUESTS,
+        "sustained guessing is made to wait"
+    );
+    assert!(response.headers().contains_key(header::RETRY_AFTER));
+
+    // The lockout is not a bypass: the right token doesn't slip through it.
+    let response = guess("token=s3cret").await.unwrap();
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert!(response.headers().get(header::SET_COOKIE).is_none());
+}
+
+#[tokio::test]
+async fn a_lan_address_reaches_an_instance_that_named_no_hostname() {
+    // Bound to everything, as a container or a LAN service is, with nothing in
+    // the allowlist. Reaching it by address must not need configuration first.
+    // A non-loopback bind forces auth on, so the extension's token comes too.
+    let (state, _dir) = test_state_with(|c| {
+        c.bind = "0.0.0.0:8787".parse().unwrap();
+        c.token = Some("s3cret".into());
+    });
+    let app = magpie::app(state);
+
+    for host in ["192.168.1.50:8787", "10.0.0.8", "[fe80::1]:8787"] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/")
+                    .header(header::HOST, host)
+                    .header(header::AUTHORIZATION, "Bearer s3cret")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK, "{host} reaches the app");
+    }
+
+    // A name still has to be vouched for, because a name is what gets rebound.
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/")
+                .header(header::HOST, "evil.example.com")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::MISDIRECTED_REQUEST);
+}
+
+#[tokio::test]
+async fn the_public_url_host_is_allowed_without_repeating_it() {
+    let (state, _dir) =
+        test_state_with(|c| c.public_url = Some("https://magpie.example.com".into()));
+    let app = magpie::app(state);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/")
+                .header(header::HOST, "magpie.example.com")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "naming the public URL is enough; the allowlist need not repeat it"
     );
 }

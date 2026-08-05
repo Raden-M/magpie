@@ -63,8 +63,12 @@
       <p class="lede">Point the extension at your self-hosted Magpie backend.</p>
 
       <label for="backendUrl">Backend URL</label>
-      <input id="backendUrl" type="url" placeholder="http://127.0.0.1:8787" spellcheck="false" />
-      <div class="hint">Where your Magpie server is reachable.</div>
+      <input id="backendUrl" type="text" placeholder="http://127.0.0.1:8787" spellcheck="false" />
+      <div class="hint">
+        Where your Magpie server is reachable. You can paste the whole connect string
+        the backend prints at startup - the token comes with it. Saving asks for
+        permission to reach that address.
+      </div>
 
       <label for="token">Token</label>
       <input id="token" type="password" placeholder="(none for a local, loopback backend)" spellcheck="false" />

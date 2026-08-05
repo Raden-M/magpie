@@ -1,5 +1,5 @@
 //! Unified full-text search across highlight quotes/notes and snapshot content,
-//! ranked with BM25 and grouped by page (docs/06-api.md `GET /api/search`).
+//! ranked with BM25 and grouped by page - what `GET /api/search` returns.
 
 use rusqlite::{Connection, params};
 

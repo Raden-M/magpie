@@ -1,5 +1,7 @@
 // Settings storage. Kept in `chrome.storage.local` (not `sync`) so the bearer
-// token is never uploaded to the browser vendor's sync (docs/08-deployment.md).
+// token is never uploaded to the browser vendor's sync (docs/usage.md).
+//
+// Parsing what goes in these fields lives in `pairing.ts`.
 
 import { ext } from "./ext.js";
 import type { Settings } from "./types.js";
@@ -17,9 +19,4 @@ export async function getSettings(): Promise<Settings> {
 
 export async function setSettings(patch: Partial<Settings>): Promise<void> {
   await ext.storage.local.set(patch);
-}
-
-/** Normalize a base URL: trim, drop a trailing slash. */
-export function normalizeBackendUrl(url: string): string {
-  return url.trim().replace(/\/+$/, "");
 }

@@ -1,7 +1,7 @@
 // Backend HTTP client. Only the service worker calls this (it holds the base URL
 // + token and is allowed the cross-origin request).
 
-import { normalizeBackendUrl } from "./config.js";
+import { normalizeBackendUrl } from "./pairing.js";
 import type { AssembledCapture, CaptureResponse, Settings } from "./types.js";
 
 export class CaptureError extends Error {
@@ -42,8 +42,12 @@ export async function postCapture(
   try {
     response = await fetch(`${base}/api/captures`, { method: "POST", headers, body: form });
   } catch (err) {
+    // Indistinguishable from here: the backend is down, or the host permission
+    // for it was never granted. Name both, since re-saving the options is the
+    // fix for the second and isn't an obvious thing to try.
     throw new CaptureError(
-      `Couldn't reach Magpie at ${base}. Is the backend running?`,
+      `Couldn't reach Magpie at ${base}. Check the backend is running, and open ` +
+        `Magpie's options and hit Save to grant access to it.`,
     );
   }
 
@@ -57,6 +61,11 @@ export async function postCapture(
     }
     if (response.status === 401) {
       message = "Magpie rejected the token. Check it in the extension options.";
+    }
+    if (response.status === 421) {
+      message =
+        "Magpie doesn't answer to that hostname. Set MAGPIE_PUBLIC_URL on the server to the " +
+        "address you reach it at.";
     }
     throw new CaptureError(message, response.status);
   }

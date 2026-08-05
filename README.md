@@ -8,20 +8,51 @@
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick start</a> ·
-  <a href="#how-it-works">How it works</a> ·
-  <a href="docs/usage.md">Full docs</a> ·
+  <a href="#get-started">Get started</a> ·
+  <a href="#why">Why</a> ·
+  <a href="docs/usage.md">Docs</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a> ·
   <a href="LICENSE">MIT</a>
 </p>
 
 ---
 
-<!-- Replace the src below with the URL GitHub gives you when you drag the
-     recording into the README editor (it becomes a github.com/user-attachments
-     link), or commit the file to docs/media/ and keep this relative path. -->
-<video src="docs/media/magpie-demo.mp4" controls muted loop playsinline width="100%"></video>
+<!-- DEMO RECORDING -----------------------------------------------------------
+     Drag the video file into the GitHub README editor; GitHub uploads it and
+     leaves a https://github.com/user-attachments/... URL in its place. Put that
+     URL in the src below and delete these comment markers.
 
-> Highlight, keep, and find it again - the whole loop in under a minute.
+<p align="center">
+  <video src="PASTE_THE_USER_ATTACHMENTS_URL_HERE" controls muted loop playsinline width="100%"></video>
+</p>
+
+<p align="center"><em>Highlight, keep, and find it again - the whole loop in under a minute.</em></p>
+
+----------------------------------------------------------------------------- -->
+
+## Get started
+
+You'll need [Rust](https://rustup.rs) and [Node 23.6+](https://nodejs.org).
+
+```sh
+git clone https://github.com/Raden-M/magpie
+cd magpie
+make dev
+```
+
+Then load the extension into Firefox, once:
+
+1. Copy `about:debugging#/runtime/this-firefox` into the address bar
+2. **Load Temporary Add-on** → pick any file inside `extension/dist-firefox/`
+
+**Done.** Select text on any page and a pill appears - hit **Keep**. Your collection is at
+<http://127.0.0.1:8787>.
+
+There's nothing to configure. The extension ships pointed at your own machine, and a local Magpie
+needs no token, so there are no settings to fill in and no pairing step.
+
+> Firefox drops a temporary add-on when it restarts, so you re-load it after a restart. Permanent,
+> auto-updating installs arrive with the first signed release.
 
 ## Why
 
@@ -31,68 +62,84 @@ read-later apps save an article you will not reread; notes apps save a quote wit
 where it came from.
 
 Magpie saves the sentence **and** the page around it, on hardware you control, in a format that
-outlives the site.
+outlives the site. Single-user, local-first, one binary and one folder of data - no account, no
+cloud, no telemetry.
 
 > A magpie's blue-green-purple is *structural colour*: the feather holds no blue pigment. The colour
 > is an interference effect that appears only when light catches the structure at the right angle,
 > against a black base. The interface works the same way: everything is quiet and grey, and the only
 > colour in the room is your highlights.
 
-## What it does
-
-- **Capture.** Select text on any page and a pill appears: pick a colour, add a note, hit **Keep**.
-  Or use `Ctrl/Cmd+Shift+K` and skip the pill. You never leave the page.
-- **Keep.** The article is saved with it, as clean readable text rather than a screenshot. Your
-  highlight is still there after the page isn't.
-- **Read.** Each highlight comes back with the passage around it, plus a side rail that follows you
-  down the page and a link straight to the words on the live site. The full article is one click
-  behind it.
-- **Find.** Search every highlight, note, and saved article at once. It's fast, and it never leaves
-  your machine.
-
-Single-user, local-first, one binary and one folder of data. Runs on your laptop or on a box you
-own - the same artifact either way, no account, no cloud, no telemetry.
-
-## Quick start
-
-```sh
-make dev
-```
-
-That builds the extension and starts the backend on <http://127.0.0.1:8787>. On loopback with no
-token, auth is off - open that URL and the collection is yours.
-
-Then load the extension: in a Chromium browser, `chrome://extensions` → **Developer mode** → **Load
-unpacked** → pick `extension/dist`. Set the backend URL in the options page, and highlight
-something.
+## Other ways to run it
 
 <details>
-<summary>Firefox, release builds, and the rest of <code>make</code></summary>
+<summary><b>Without Rust</b> - run the backend in Docker</summary>
 
 ```sh
-make dev-firefox    # build the Firefox extension (extension/dist-firefox), then run the backend
-make build          # release binary + extension
-make test           # backend and extension test suites
-make docker         # build the release container image
+make docker-up
 ```
+
+Starts the backend in a container, builds the extension, generates a token and prints a connect
+string. Load the extension as above, then click the **Magpie icon** in the Firefox toolbar and paste
+that string into **Backend URL**. `make connect` prints it again if you lose it.
+
+A container is reachable from the Docker network rather than just your machine, which is why this
+path has a token and the from-source one doesn't.
 
 </details>
 
-For deploying to a remote host, the security posture, configuration, and backups, see
-[`docs/usage.md`](docs/usage.md).
+<details>
+<summary><b>Always running</b> - so it survives a reboot</summary>
+
+`make dev` holds a terminal open. For a permanent local install, see
+[`packaging/`](packaging/README.md) for a systemd user unit, or leave the Docker instance up.
+
+</details>
+
+<details>
+<summary><b>On a server</b> - reachable from other machines</summary>
+
+Magpie sits behind a reverse proxy that terminates TLS, guarded by a token. Set it up with
+[`docs/usage.md`](docs/usage.md#deploying-remotely), then paste the connect string into the
+extension. You sign in to the web UI once per browser.
+
+</details>
+
+<details>
+<summary><b>Chromium</b> - works, but isn't the shipping target</summary>
+
+```sh
+make extension-chromium
+```
+
+Then `chrome://extensions` → **Developer mode** → **Load unpacked** → `extension/dist`. There's no
+Chrome Web Store listing yet, and
+[a decision record](docs/decisions/2026-08-05-chrome-web-store-deferred.md) explains why.
+
+</details>
 
 ## How it works
 
-Two codebases with a versioned HTTP API between them:
+Two codebases with an HTTP API between them:
 
 | | |
 | --- | --- |
 | **`backend/`** | A single static Rust binary (`axum` + SQLite/FTS5). Stores, searches, and serves the collection and the reader view. It never re-fetches pages, so it needs no outbound network at all. |
-| **`extension/`** | A TypeScript Manifest V3 extension (Chromium and Firefox). Does everything that needs the live page: reading the selection, extracting the reader view (`Readability.js` + `DOMPurify`), collecting images, and posting finished captures to the backend. |
+| **`extension/`** | A TypeScript Manifest V3 extension (Firefox and Chromium). Does everything that needs the live page: reading the selection, extracting the reader view (`Readability.js` + `DOMPurify`), collecting images, and posting finished captures to the backend. |
 
 The split is the point: only the browser can see the page you are reading, and only your server
 should see what you kept.
 
+More in [`docs/architecture.md`](docs/architecture.md), and the reasoning behind the awkward calls
+in [`docs/decisions/`](docs/decisions/).
+
+## Contributing
+
+Send the pull request - no need to open an issue and wait first.
+[`CONTRIBUTING.md`](CONTRIBUTING.md) covers the setup and the one thing that gets a change turned
+down (scope). Security problems are the exception and have [their own process](SECURITY.md).
+
 ## License
 
-[MIT](LICENSE).
+[MIT](LICENSE). Third-party components keep their own licenses - see
+[`THIRD-PARTY.md`](THIRD-PARTY.md).

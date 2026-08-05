@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest something Magpie should do
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Magpie is deliberately narrow. Multi-user, accounts, sharing, sync between devices and
+        built-in backups are explicit non-goals - not "not yet", but decisions the data model and
+        auth are built around. Anything needing those won't be merged, however well built.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: >
+        The problem, not the solution. What were you doing when you wanted this, and what did you
+        do instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like it to do?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: half
+    attributes:
+      label: Which half would change
+      options:
+        - Extension
+        - Backend
+        - Both, or not sure
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What else have you considered?
+      description: Including whether something outside Magpie already solves it.

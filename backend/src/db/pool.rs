@@ -43,9 +43,7 @@ impl Db {
             .context("building SQLite pool")?;
 
         let mut conn = pool.get().context("checking out a connection")?;
-        super::migrations()
-            .to_latest(&mut conn)
-            .context("applying migrations")?;
+        apply_migrations(&mut conn, data_dir)?;
         drop(conn);
 
         Ok(Db {
@@ -75,5 +73,26 @@ impl Db {
         })
         .await
         .map_err(|e| AppError::Internal(anyhow::anyhow!("db task panicked: {e}")))?
+    }
+}
+
+/// Migrations are forward-only, so an older binary meeting a schema a newer one
+/// wrote cannot proceed. The library already refuses; this only replaces its
+/// internal wording with something the person running it can act on - every old
+/// release stays downloadable, so this is a mistake people will actually make.
+fn apply_migrations(conn: &mut Connection, data_dir: &Path) -> anyhow::Result<()> {
+    use rusqlite_migration::{Error, MigrationDefinitionError};
+
+    match super::migrations().to_latest(conn) {
+        Ok(()) => Ok(()),
+        Err(Error::MigrationDefinition(MigrationDefinitionError::DatabaseTooFarAhead)) => {
+            anyhow::bail!(
+                "the collection in {} was created by a newer version of Magpie than this one, \
+                 and migrations cannot be undone. Run the newer version against it, or point \
+                 MAGPIE_DATA_DIR somewhere else.",
+                data_dir.display()
+            )
+        }
+        Err(e) => Err(anyhow::Error::new(e).context("applying migrations")),
     }
 }

@@ -1,6 +1,6 @@
 // Client-side URL canonicalization. Prefers <link rel="canonical">, else
 // normalizes the location. The backend re-validates independently, so this only
-// needs to be a good-faith guess (docs/03-data-model.md).
+// needs to be a good-faith guess; `backend/src/url_canon.rs` is the arbiter.
 
 const TRACKING_EXACT = new Set([
   "gclid", "fbclid", "ref", "ref_src", "ref_url", "igshid", "yclid", "dclid",

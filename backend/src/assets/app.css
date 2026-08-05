@@ -4,7 +4,7 @@
  * (blue -> teal -> purple) belongs to the highlights: those stops are the shade
  * a capture was saved with, so they answer to the data, not to taste. The brand
  * blue is identity - mark, wordmark, and the UI states that echo them. Both
- * themes are first-class. See docs/07-design-system.md. */
+ * themes are first-class. */
 
 :root {
   /* Iridescence - the accent, used only for highlights / active states. */
@@ -460,6 +460,78 @@ a { color: inherit; }
   color: var(--read-ink);
   margin: 2.8rem 0 0 !important;
 }
+
+/* --- Login ---------------------------------------------------------------- */
+
+/* The one page a locked-out visitor sees, so it carries the display face and
+   the reading italic rather than looking like a utility form. Narrower than
+   `.about` because a single field shouldn't sit under a 38rem measure. */
+.login {
+  max-width: 26rem;
+  margin: 0 auto;
+  padding: 3.5rem 1.15rem 4rem;
+  color: var(--read-ink);
+}
+.login-title {
+  font-family: var(--font-display);
+  font-weight: 540;
+  font-size: clamp(1.8rem, 5vw, 2.3rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin: 0 0 1rem;
+}
+.login-lede {
+  font-family: var(--font-read);
+  font-style: italic;
+  font-size: 1.1rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  margin: 0 0 2.2rem;
+}
+.login-form { display: flex; flex-direction: column; gap: 0.6rem; }
+.login-label {
+  font-family: var(--font-data);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+/* Shares the collection search field's shape and brand focus ring, so the two
+   text inputs in the app read as the same control. */
+.login-input {
+  width: 100%;
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  padding: 0.68rem 0.9rem;
+  color: var(--ink);
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.login-input:focus { border-color: transparent; border-image: var(--brand) 1; }
+.login-error {
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  color: var(--ir3);
+  margin: 0;
+}
+.login-submit {
+  margin-top: 0.6rem;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 500;
+  padding: 0.7rem 1rem;
+  color: var(--panel);
+  background: var(--brand);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.login-submit:hover { filter: brightness(1.08); }
+.login-submit:focus-visible { outline: 2px solid var(--b2); outline-offset: 2px; }
 
 /* --- Reader --------------------------------------------------------------- */
 

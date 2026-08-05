@@ -5,6 +5,7 @@ pub mod auth;
 pub mod captures;
 pub mod dto;
 pub mod highlights;
+pub mod host_guard;
 pub mod media;
 pub mod pages;
 pub mod search;
@@ -59,11 +60,18 @@ pub fn router(state: AppState) -> Router {
         .route("/api/search", get(search::search))
         .route("/api/stats", get(stats::get))
         .route("/about", get(web::about::page))
+        .route("/login", get(web::login::form).post(web::login::submit))
         .route("/media/{hash}", get(media::serve))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_auth,
         ))
         .layer(auth::cors_layer(&state.config.allowed_origins))
+        // Outermost, so a request for a hostname we don't answer to is refused
+        // before it can reach auth, CORS or any handler.
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            host_guard::require_known_host,
+        ))
         .with_state(state)
 }

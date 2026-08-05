@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A new push to a PR makes the in-flight run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+
+      - name: Format
+        working-directory: backend
+        run: cargo fmt --check
+
+      - name: Clippy
+        working-directory: backend
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test
+        working-directory: backend
+        run: cargo test
+
+  extension:
+    name: Extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # The tests run TypeScript directly through native type stripping.
+          # Kept in step with `engines` in extension/package.json.
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      - name: Install
+        working-directory: extension
+        run: npm ci
+
+      # The version lives in three files that nothing keeps in step. Checking it
+      # here as well as at release time means drift is a red PR rather than a
+      # failed tag, when the fix is still one commit away.
+      - name: Check versions agree
+        run: node scripts/check-versions.mjs
+
+      - name: Typecheck
+        working-directory: extension
+        run: npm run typecheck
+
+      - name: Test
+        working-directory: extension
+        run: npm run test
+
+      # Both targets, because the Firefox manifest is derived from the Chromium
+      # one at build time - a fault in toFirefox() is invisible until it is built.
+      - name: Build (Chromium)
+        working-directory: extension
+        run: npm run build
+
+      - name: Build (Firefox)
+        working-directory: extension
+        run: npm run build:firefox
+
+      # --self-hosted, or update_url is reported as an error: addons-linter can't
+      # tell an unlisted build from a listed one, and listed add-ons may not
+      # self-update. This is the same linter AMO runs, so a failure here is a
+      # rejection caught in seconds instead of days.
+      - name: Lint the add-on
+        working-directory: extension
+        run: npx web-ext lint --source-dir=dist-firefox --self-hosted --output=json > lint.json
+
+      # web-ext exits non-zero on errors only. Four warnings are expected and
+      # irreducible - three inside vendored Readability and DOMPurify, one where
+      # sanitize.ts assigns DOMPurify's own output - so --warnings-as-errors
+      # would fail every run. Pinning the count still catches a new one.
+      - name: Check the lint baseline
+        working-directory: extension
+        run: |
+          # The single quotes hold a node script, not a shell string.
+          # shellcheck disable=SC2016
+          node -e '
+            const r = require("./lint.json");
+            const expected = 4;
+            console.log(`errors: ${r.errors.length}, warnings: ${r.warnings.length}`);
+            for (const w of [...r.errors, ...r.warnings]) {
+              console.log(`  ${w.code} ${w.file ?? ""}:${w.line ?? ""}`);
+            }
+            if (r.errors.length > 0) {
+              console.error("\naddons-linter reported errors; AMO would reject this.");
+              process.exit(1);
+            }
+            if (r.warnings.length !== expected) {
+              console.error(`\nexpected exactly ${expected} known warnings, got ${r.warnings.length}.`);
+              console.error("If this is deliberate, update the baseline here and in .claude/rules/extension.md.");
+              process.exit(1);
+            }
+          '
+
+  versions:
+    name: Versions agree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      # Not gated on a tag: catching the drift on the PR that caused it is
+      # cheaper than catching it when a release is already half-published.
+      - run: node scripts/check-versions.mjs
+
+  container:
+    name: Container builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

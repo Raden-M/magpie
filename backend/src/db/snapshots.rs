@@ -1,5 +1,5 @@
 //! Snapshot storage and the versioning rule: reuse the latest snapshot when the
-//! content is unchanged, otherwise store a new version (docs/03-data-model.md).
+//! content is unchanged, otherwise store a new version.
 
 use rusqlite::{Connection, OptionalExtension, params};
 

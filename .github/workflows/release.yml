@@ -1,0 +1,335 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build, e.g. v0.2.0"
+        required: true
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Nothing is published until the three declared versions and the tag agree.
+  # A release whose binary says 0.2.0 and whose extension says 0.1.0 looks fine
+  # until someone tries to debug it.
+  gate:
+    name: Version gate
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+      image: ${{ steps.v.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - id: v
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          # GHCR rejects an uppercase path, and the owner here has one.
+          IMAGE="ghcr.io/$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')/magpie"
+          {
+            echo "tag=$TAG"
+            echo "version=${TAG#v}"
+            echo "image=$IMAGE"
+          } >> "$GITHUB_OUTPUT"
+      - run: node scripts/check-versions.mjs "${{ steps.v.outputs.tag }}"
+
+  # Native runners throughout. rusqlite's `bundled` feature compiles SQLite from
+  # C, so `cargo build --target` alone doesn't cross-compile - it needs a C
+  # toolchain for the target. Native runners sidestep that entirely, except for
+  # Intel macOS, where the Xcode SDK on an arm64 runner cross-compiles cleanly.
+  binaries:
+    name: ${{ matrix.name }}
+    needs: gate
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - name: linux-aarch64
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - name: macos-aarch64
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - name: macos-x86_64
+            os: macos-latest
+            target: x86_64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.tag }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+          key: ${{ matrix.target }}
+
+      - name: Build
+        working-directory: backend
+        run: cargo build --release --locked --target ${{ matrix.target }} --bin magpie
+
+      - name: Package
+        working-directory: backend
+        run: |
+          NAME="magpie-${{ needs.gate.outputs.version }}-${{ matrix.name }}"
+          mkdir -p "dist/$NAME"
+          cp "target/${{ matrix.target }}/release/magpie" "dist/$NAME/"
+          cp ../LICENSE ../THIRD-PARTY.md ../README.md "dist/$NAME/"
+          tar -czf "$NAME.tar.gz" -C dist "$NAME"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.name }}
+          path: backend/magpie-*.tar.gz
+          if-no-files-found: error
+
+  # Built on native runners and pushed by digest, then stitched into one
+  # manifest below. Emulating an arm64 Rust build under QEMU takes long enough
+  # to make a release painful.
+  image:
+    name: Image (${{ matrix.name }})
+    needs: gate
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: amd64
+            os: ubuntu-latest
+            platform: linux/amd64
+          - name: arm64
+            os: ubuntu-24.04-arm
+            platform: linux/arm64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.tag }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          platforms: ${{ matrix.platform }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          outputs: type=image,name=${{ needs.gate.outputs.image }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export the digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.name }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+
+  image-manifest:
+    name: Image manifest
+    needs: [gate, image]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push the manifest list
+        working-directory: /tmp/digests
+        env:
+          IMAGE: ${{ needs.gate.outputs.image }}
+          VERSION: ${{ needs.gate.outputs.version }}
+        run: |
+          # Word splitting is the point: one @sha256 argument per platform digest.
+          # shellcheck disable=SC2046
+          docker buildx imagetools create \
+            -t "${IMAGE}:${VERSION}" \
+            -t "${IMAGE}:latest" \
+            $(printf "${IMAGE}@sha256:%s " *)
+          docker buildx imagetools inspect "${IMAGE}:${VERSION}"
+
+  # Signing is what makes a self-hosted xpi installable at all: release Firefox
+  # refuses unsigned add-ons, so an unsigned build vanishes on restart. Unlisted
+  # means Mozilla signs the file and hands it back - there is no public listing
+  # and no review queue, so a tag can go out in minutes.
+  extension:
+    name: Sign the extension
+    needs: gate
+    runs-on: ubuntu-latest
+    # Promoted to job level because `secrets` is not available in a step's `if`.
+    # Signing is skipped, not failed, when the credentials aren't configured -
+    # so a first tag still produces a usable release before AMO is set up.
+    env:
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.tag }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      - name: Install
+        working-directory: extension
+        run: npm ci
+
+      - name: Build both targets
+        working-directory: extension
+        run: |
+          npm run build
+          npm run build:firefox
+
+      # The Chromium build ships as a zip to load unpacked; there is no store
+      # listing yet (see docs/decisions/).
+      - name: Package the Chromium build
+        working-directory: extension/dist
+        run: zip -r "../magpie-chromium-${{ needs.gate.outputs.version }}.zip" .
+
+      - name: Warn when signing is skipped
+        if: env.AMO_JWT_ISSUER == ''
+        run: |
+          echo "::warning::AMO_JWT_ISSUER/AMO_JWT_SECRET are not set - no signed .xpi in this release."
+
+      - name: Sign the Firefox build
+        if: env.AMO_JWT_ISSUER != ''
+        working-directory: extension
+        run: |
+          npx --yes web-ext sign \
+            --source-dir=dist-firefox \
+            --artifacts-dir=artifacts \
+            --channel=unlisted \
+            --api-key="$AMO_JWT_ISSUER" \
+            --api-secret="$AMO_JWT_SECRET"
+          mv artifacts/*.xpi "magpie-${{ needs.gate.outputs.version }}.xpi"
+
+      # Firefox reads this to find newer versions; `latest/download` in the
+      # manifest's update_url always resolves to the newest release.
+      - name: Write updates.json
+        if: env.AMO_JWT_ISSUER != ''
+        working-directory: extension
+        run: |
+          VERSION="${{ needs.gate.outputs.version }}"
+          TAG="${{ needs.gate.outputs.tag }}"
+          HASH="sha256:$(sha256sum "magpie-$VERSION.xpi" | cut -d' ' -f1)"
+          cat > updates.json <<EOF
+          {
+            "addons": {
+              "magpie@raden.me": {
+                "updates": [
+                  {
+                    "version": "$VERSION",
+                    "update_link": "https://github.com/${{ github.repository }}/releases/download/$TAG/magpie-$VERSION.xpi",
+                    "update_hash": "$HASH"
+                  }
+                ]
+              }
+            }
+          }
+          EOF
+          cat updates.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension
+          path: |
+            extension/magpie-*.zip
+            extension/magpie-*.xpi
+            extension/updates.json
+          if-no-files-found: error
+
+  release:
+    name: Publish the release
+    needs: [gate, binaries, image-manifest, extension]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.tag }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/assets
+          pattern: binary-*
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: extension
+          path: /tmp/assets
+
+      - name: Checksums
+        working-directory: /tmp/assets
+        run: |
+          ls -la
+          sha256sum magpie-* > checksums.txt
+          cat checksums.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.gate.outputs.tag }}
+          files: /tmp/assets/*
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            **Docker**
+
+            ```sh
+            docker pull ${{ needs.gate.outputs.image }}:${{ needs.gate.outputs.version }}
+            ```
+
+            **Binary** - download the archive for your platform below, then see
+            [packaging](https://github.com/${{ github.repository }}/blob/main/packaging/README.md)
+            to keep it running.
+
+            **Firefox** - install `magpie-${{ needs.gate.outputs.version }}.xpi`. It is signed and
+            updates itself from here.
+
+            **Chromium** - unzip `magpie-chromium-${{ needs.gate.outputs.version }}.zip` and load it
+            unpacked. No store listing yet.
+
+            Verify a download against `checksums.txt`.

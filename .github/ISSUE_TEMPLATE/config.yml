@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Raden-M/magpie/security/advisories/new
+    about: The one thing that goes here rather than straight to a pull request - a public patch describes the hole before anyone can upgrade.
