@@ -160,7 +160,7 @@ jobs:
     needs: [gate, image]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: /tmp/digests
           pattern: digest-*
@@ -290,13 +290,13 @@ jobs:
         with:
           ref: ${{ needs.gate.outputs.tag }}
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: /tmp/assets
           pattern: binary-*
           merge-multiple: true
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: extension
           path: /tmp/assets
