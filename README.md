@@ -109,8 +109,9 @@ in [`docs/decisions/`](docs/decisions/).
 
 ## Contributing
 
-Issues and pull requests are welcome - see [`CONTRIBUTING.md`](CONTRIBUTING.md). Security reports
-have [their own process](SECURITY.md).
+Send the pull request - no need to open an issue and wait first. [`CONTRIBUTING.md`](CONTRIBUTING.md)
+covers the setup and the one thing that gets a change turned down (scope). Security problems are the
+exception and have [their own process](SECURITY.md).
 
 ## License
 

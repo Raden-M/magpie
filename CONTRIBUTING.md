@@ -1,7 +1,10 @@
 # Contributing
 
-Thanks for looking. Magpie is a small, single-user tool with a deliberately narrow scope, so the
-most useful thing you can do before writing code is open an issue and check the idea fits.
+Thanks for looking. **Send the pull request** - you don't need to ask first, and there's no need to
+open an issue and wait for a reply before writing code.
+
+The one thing worth reading before you start is [Scope](#scope) at the bottom. Magpie is
+deliberately narrow, and that's the only reason a well-built change gets turned down.
 
 ## Getting set up
 
@@ -66,11 +69,13 @@ decision record in `docs/decisions/` using [the template](docs/decisions/TEMPLAT
 
 ## Reporting bugs
 
-Include what you ran, what happened, and what you expected. For anything involving capture, the
-page URL matters enormously - reader extraction and anchoring are where the interesting failures
-live, and they're site-specific.
+A pull request with a failing test, or a fix, is more welcome than a report - but a plain issue is
+fine too. Include what you ran, what happened, and what you expected. For anything involving
+capture, the page URL matters enormously: reader extraction and anchoring are where the interesting
+failures live, and they're site-specific.
 
-**Do not open a public issue for a security problem.** See [`SECURITY.md`](SECURITY.md).
+**Security problems are the one exception** - those go through [`SECURITY.md`](SECURITY.md), because
+a public patch describes the hole to everyone before anyone can upgrade.
 
 ## Scope
 
