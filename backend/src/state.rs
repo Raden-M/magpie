@@ -1,7 +1,8 @@
 //! Shared application state handed to every handler via `axum::extract::State`.
 
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -25,6 +26,8 @@ pub struct AppState {
     /// every outstanding cookie stops matching. Restarting on an unchanged
     /// token reproduces it exactly, so browsers stay signed in.
     pub session: Arc<String>,
+    /// Failed `POST /login` attempts, throttled to make guessing pointless.
+    pub login_throttle: Arc<Mutex<LoginThrottle>>,
 }
 
 impl AppState {
@@ -35,7 +38,18 @@ impl AppState {
             db,
             config: Arc::new(config),
             session: Arc::new(session),
+            login_throttle: Arc::new(Mutex::new(LoginThrottle::default())),
         }
+    }
+
+    /// The login throttle, recovering from a poisoned lock rather than
+    /// panicking. It guards two plain counters with no invariant a panic
+    /// elsewhere could have broken, and a permanently unusable login form is a
+    /// far worse outcome than a slightly stale attempt count.
+    pub fn throttle(&self) -> std::sync::MutexGuard<'_, LoginThrottle> {
+        self.login_throttle
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 }
 
@@ -124,6 +138,56 @@ fn write_private(path: &Path, contents: &str) -> std::io::Result<()> {
     std::io::Write::write_all(&mut file, contents.as_bytes())
 }
 
+/// How many wrong tokens are tolerated before `POST /login` starts stalling.
+const FREE_ATTEMPTS: u32 = 5;
+/// The first lockout, doubling from there.
+const BASE_LOCKOUT: u64 = 2;
+/// The longest a lockout ever lasts.
+const MAX_LOCKOUT: Duration = Duration::from_secs(60);
+
+/// A guessing throttle for the login form.
+///
+/// One counter for the whole instance, not one per client address: Magpie is
+/// single-user, so there is no legitimate second party to starve, and a per-IP
+/// map is unbounded memory that an attacker chooses the size of. The cost is
+/// that someone who can reach the form can keep the owner waiting up to
+/// [`MAX_LOCKOUT`]; that is a far better trade than unlimited guesses against a
+/// token the operator may well have chosen by hand.
+#[derive(Default)]
+pub struct LoginThrottle {
+    failures: u32,
+    locked_until: Option<Instant>,
+}
+
+impl LoginThrottle {
+    /// How long the caller must wait, if it must wait at all.
+    pub fn retry_after(&self) -> Option<Duration> {
+        let until = self.locked_until?;
+        until.checked_duration_since(Instant::now())
+    }
+
+    /// Doubling backoff once the free attempts are spent, capped so a locked
+    /// out owner is never more than a minute from trying again.
+    ///
+    /// The failure that spends the last free attempt is answered, and locks the
+    /// next one - so [`FREE_ATTEMPTS`] wrong tokens get a straight reply and the
+    /// one after that waits.
+    pub fn record_failure(&mut self) {
+        self.failures = self.failures.saturating_add(1);
+        let Some(over) = self.failures.checked_sub(FREE_ATTEMPTS) else {
+            return;
+        };
+        let seconds = BASE_LOCKOUT.checked_shl(over).unwrap_or(u64::MAX);
+        let wait = Duration::from_secs(seconds).min(MAX_LOCKOUT);
+        self.locked_until = Some(Instant::now() + wait);
+    }
+
+    pub fn record_success(&mut self) {
+        self.failures = 0;
+        self.locked_until = None;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -209,5 +273,47 @@ mod tests {
         // No such directory, so both the read and the write fail.
         let key = load_or_create_session_key(Path::new("/nonexistent/magpie-should-not-exist"));
         assert!(key.len() >= 43, "serving continues without persistence");
+    }
+
+    #[test]
+    fn the_throttle_is_quiet_until_the_free_attempts_are_spent() {
+        let mut throttle = LoginThrottle::default();
+        for _ in 0..FREE_ATTEMPTS - 1 {
+            throttle.record_failure();
+            assert!(throttle.retry_after().is_none(), "a typo is not an attack");
+        }
+
+        throttle.record_failure();
+        assert!(throttle.retry_after().is_some(), "guessing starts costing");
+
+        throttle.record_success();
+        assert!(
+            throttle.retry_after().is_none(),
+            "the right token clears the lockout"
+        );
+    }
+
+    #[test]
+    fn the_lockout_backs_off_but_stays_bounded() {
+        let mut throttle = LoginThrottle::default();
+        for _ in 0..FREE_ATTEMPTS {
+            throttle.record_failure();
+        }
+        let first = throttle.retry_after().unwrap();
+
+        throttle.record_failure();
+        assert!(
+            throttle.retry_after().unwrap() > first,
+            "each guess costs more"
+        );
+
+        // Far past the point where a doubling delay would overflow a u64.
+        for _ in 0..128 {
+            throttle.record_failure();
+        }
+        assert!(
+            throttle.retry_after().unwrap() <= MAX_LOCKOUT,
+            "the owner is never locked out for longer than the cap"
+        );
     }
 }

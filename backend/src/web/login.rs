@@ -54,9 +54,22 @@ pub async fn submit(
         return Redirect::to("/").into_response();
     }
 
+    // Checked before the token is even compared, so a lockout cannot be
+    // sidestepped and the comparison isn't a timing oracle under load.
+    if let Some(wait) = state.throttle().retry_after() {
+        let seconds = wait.as_secs().max(1);
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            [(header::RETRY_AFTER, seconds.to_string())],
+            page(Some("Too many wrong tokens. Wait a moment and try again.")),
+        )
+            .into_response();
+    }
+
     let expected = state.config.token.as_deref().unwrap_or_default();
     let presented = input.token.trim();
     if expected.is_empty() || !constant_time_eq(presented.as_bytes(), expected.as_bytes()) {
+        state.throttle().record_failure();
         return (
             StatusCode::UNAUTHORIZED,
             page(Some(
@@ -65,6 +78,8 @@ pub async fn submit(
         )
             .into_response();
     }
+
+    state.throttle().record_success();
 
     let mut cookie = format!(
         "{SESSION_COOKIE}={}; HttpOnly; SameSite=Strict; Path=/",

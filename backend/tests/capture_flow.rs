@@ -662,6 +662,44 @@ async fn rotating_the_token_signs_every_browser_out() {
 }
 
 #[tokio::test]
+async fn guessing_the_token_is_throttled() {
+    let (state, _dir) = locked_state();
+    let app = magpie::app(state);
+
+    let guess = |body: &'static str| {
+        app.clone().oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/login")
+                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .body(Body::from(body))
+                .unwrap(),
+        )
+    };
+
+    // A handful of typos still get a straight answer.
+    for _ in 0..5 {
+        assert_eq!(
+            guess("token=wrong").await.unwrap().status(),
+            StatusCode::UNAUTHORIZED
+        );
+    }
+
+    let response = guess("token=wrong").await.unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::TOO_MANY_REQUESTS,
+        "sustained guessing is made to wait"
+    );
+    assert!(response.headers().contains_key(header::RETRY_AFTER));
+
+    // The lockout is not a bypass: the right token doesn't slip through it.
+    let response = guess("token=s3cret").await.unwrap();
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert!(response.headers().get(header::SET_COOKIE).is_none());
+}
+
+#[tokio::test]
 async fn a_lan_address_reaches_an_instance_that_named_no_hostname() {
     // Bound to everything, as a container or a LAN service is, with nothing in
     // the allowlist. Reaching it by address must not need configuration first.
