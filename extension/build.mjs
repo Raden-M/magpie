@@ -38,8 +38,25 @@ const buildOptions = {
   logLevel: "info",
 };
 
+/**
+ * The `owner/name` this repository publishes as, read from `package.json`.
+ *
+ * The release workflow builds the same slug from `github.repository`, so this
+ * is the only place it is written down - a fork that updates `repository` gets
+ * an `update_url` pointing at its own releases rather than silently checking
+ * upstream's for updates it can never install.
+ */
+function repoSlug(pkg) {
+  const url = pkg.repository?.url;
+  const slug = url?.match(/github\.com[/:]([^/]+\/[^/.]+)/)?.[1];
+  if (!slug) {
+    throw new Error("extension/package.json needs a GitHub `repository.url` for update_url");
+  }
+  return slug;
+}
+
 /** Derive the Firefox manifest from the canonical Chromium one. */
-function toFirefox(manifest) {
+function toFirefox(manifest, slug) {
   const m = structuredClone(manifest);
   // Firefox MV3 uses a non-persistent event page, not a service worker.
   m.background = { scripts: ["background.js"] };
@@ -60,7 +77,7 @@ function toFirefox(manifest) {
       id: "magpie@raden.me",
       strict_min_version: "140.0",
       data_collection_permissions: { required: ["websiteContent"] },
-      update_url: "https://github.com/Raden-M/magpie/releases/latest/download/updates.json",
+      update_url: `https://github.com/${slug}/releases/latest/download/updates.json`,
     },
     // Android carries the same declaration, and only got it in 142.
     gecko_android: { strict_min_version: "142.0" },
@@ -75,7 +92,8 @@ function toFirefox(manifest) {
 
 async function writeManifest() {
   const source = JSON.parse(await readFile(resolve(root, "manifest.json"), "utf8"));
-  const manifest = firefox ? toFirefox(source) : source;
+  const pkg = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+  const manifest = firefox ? toFirefox(source, repoSlug(pkg)) : source;
   await writeFile(resolve(outdir, "manifest.json"), JSON.stringify(manifest, null, 2));
 }
 

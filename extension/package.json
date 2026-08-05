@@ -4,6 +4,10 @@
   "description": "Magpie - capture highlighted text from the web into your self-hosted backend.",
   "private": true,
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Raden-M/magpie.git"
+  },
   "engines": {
     "node": ">=23.6"
   },
