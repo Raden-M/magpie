@@ -15,7 +15,7 @@ pub struct Config {
     pub bind: SocketAddr,
 
     /// Directory holding the SQLite database, snapshots, and media.
-    #[arg(long, env = "MAGPIE_DATA_DIR", default_value = "./data")]
+    #[arg(long, env = "MAGPIE_DATA_DIR", default_value_os_t = default_data_dir())]
     pub data_dir: PathBuf,
 
     /// Bearer token. Unset + loopback bind disables auth for local-only use.
@@ -40,10 +40,32 @@ pub struct Config {
     pub log: String,
 }
 
+/// Where the collection lives when nobody says otherwise.
+///
+/// Deliberately absolute. A relative default is resolved against the working
+/// directory, so the same command run from two places would open two different
+/// collections - and under a service manager, whose working directory is the
+/// home directory, it would silently start an empty one. Falls back to `./data`
+/// only if the platform has no data directory at all.
+fn default_data_dir() -> PathBuf {
+    dirs::data_dir()
+        .map(|dir| dir.join("magpie"))
+        .unwrap_or_else(|| PathBuf::from("./data"))
+}
+
 impl Config {
     /// Whether the configured bind address is a loopback interface.
     pub fn is_loopback(&self) -> bool {
         self.bind.ip().is_loopback()
+    }
+
+    /// The one-paste pairing string for the extension: the address to reach us
+    /// at, with the token carried in the fragment. A fragment is never sent to
+    /// a server, so pasting it back into a URL bar cannot leak the token.
+    pub fn connect_string(&self) -> Option<String> {
+        let token = self.token.as_deref()?;
+        let scheme = if self.is_loopback() { "http" } else { "https" };
+        Some(format!("{scheme}://{}#{token}", self.bind))
     }
 
     /// Auth is enforced whenever a token is set, or the bind is non-loopback.

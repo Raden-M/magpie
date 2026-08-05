@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Capture highlighted text from the web into your self-hosted Magpie backend.",
   "permissions": ["contextMenus", "storage", "scripting", "activeTab"],
-  "host_permissions": ["http://127.0.0.1:8787/*"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
   "background": {
     "service_worker": "background.js",
     "type": "module"

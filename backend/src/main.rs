@@ -15,6 +15,12 @@ async fn main() -> anyhow::Result<()> {
 
     let listener = tokio::net::TcpListener::bind(config.bind).await?;
     tracing::info!(bind = %config.bind, data_dir = %config.data_dir.display(), "magpie listening");
+    if let Some(connect) = config.connect_string() {
+        // Pairing is the one step that needs a value from over here, so print it
+        // in the form the options page accepts rather than making people
+        // assemble a URL and a token by hand.
+        tracing::info!("pair the extension by pasting this into its options: {connect}");
+    }
     axum::serve(listener, magpie::app(state)).await?;
     Ok(())
 }

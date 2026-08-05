@@ -1,7 +1,13 @@
 // Options page controller: load/save the backend URL, token, and default shade,
-// plus a connection test against the backend's /healthz.
+// request access to whichever backend was named, and test the connection.
 
-import { getSettings, normalizeBackendUrl, setSettings } from "../shared/config.js";
+import { getSettings, setSettings } from "../shared/config.js";
+import { ext } from "../shared/ext.js";
+import {
+  normalizeBackendUrl,
+  originPatternFor,
+  parseConnectString,
+} from "../shared/pairing.js";
 
 const backendUrl = document.getElementById("backendUrl") as HTMLInputElement;
 const token = document.getElementById("token") as HTMLInputElement;
@@ -22,9 +28,49 @@ async function load(): Promise<void> {
   defaultShade.value = settings.defaultShade;
 }
 
+/**
+ * Ask for access to this backend, if we don't already have it.
+ *
+ * Magpie can be hosted anywhere, so the manifest declares the origins as
+ * *optional* and we request the single one in use. That keeps the install
+ * prompt quiet, and it is the only way a remote backend works at all - without
+ * a host permission the request is subject to CORS, and on Firefox the origin
+ * to allowlist is a per-profile random UUID nobody can predict.
+ *
+ * Called before anything is awaited: Firefox only honours a permission request
+ * still tied to the click that started it.
+ */
+function requestAccess(url: string): Promise<boolean> {
+  const origin = originPatternFor(url);
+  if (!origin) return Promise.resolve(false);
+  // Resolves true immediately when the permission is already held.
+  return ext.permissions.request({ origins: [origin] });
+}
+
 async function save(): Promise<void> {
+  const pairing = parseConnectString(backendUrl.value);
+  if (!pairing.backendUrl) {
+    setStatus("Enter a backend URL first.", "error");
+    return;
+  }
+  if (!originPatternFor(pairing.backendUrl)) {
+    setStatus("That doesn't look like an http:// or https:// URL.", "error");
+    return;
+  }
+
+  // A pasted connect string carries the token; reflect both fields before the
+  // await so what is saved is what the page shows.
+  backendUrl.value = pairing.backendUrl;
+  if (pairing.token) token.value = pairing.token;
+
+  const granted = await requestAccess(pairing.backendUrl);
+  if (!granted) {
+    setStatus("Magpie needs permission to reach that backend. Nothing saved.", "error");
+    return;
+  }
+
   await setSettings({
-    backendUrl: normalizeBackendUrl(backendUrl.value),
+    backendUrl: pairing.backendUrl,
     token: token.value.trim(),
     defaultShade: defaultShade.value,
   });
@@ -45,9 +91,11 @@ async function test(): Promise<void> {
     const res = await fetch(`${base}/healthz`, { headers });
     if (res.ok) setStatus("Connected.", "ok");
     else if (res.status === 401) setStatus("Reachable, but the token was rejected.", "error");
+    else if (res.status === 421)
+      setStatus("Reached a Magpie that doesn't answer to that hostname.", "error");
     else setStatus(`Backend returned ${res.status}.`, "error");
   } catch {
-    setStatus("Couldn't reach the backend.", "error");
+    setStatus("Couldn't reach the backend. Save first, so access is granted.", "error");
   }
 }
 
