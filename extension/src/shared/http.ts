@@ -64,7 +64,8 @@ export async function postCapture(
     }
     if (response.status === 421) {
       message =
-        "Magpie doesn't answer to that hostname. Add it to MAGPIE_ALLOWED_HOSTS on the server.";
+        "Magpie doesn't answer to that hostname. Set MAGPIE_PUBLIC_URL on the server to the " +
+        "address you reach it at.";
     }
     throw new CaptureError(message, response.status);
   }

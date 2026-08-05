@@ -9,6 +9,14 @@
 //! Pinning the hostnames we answer to is what closes that, because a rebound
 //! request still arrives carrying the attacker's hostname rather than ours.
 //!
+//! Note what that argument does *not* cover: an IP address literal. Rebinding
+//! needs a name, because the attack is entirely in what that name resolves to.
+//! A browser puts a bare address in `Host` only when it was pointed straight at
+//! that address, and then the origin *is* that address, so there is nothing to
+//! rebind and CORS applies normally. Literals are therefore accepted, which is
+//! also what lets a LAN instance be reached at `http://192.168.1.50:8787`
+//! without having to name itself in the allowlist first.
+//!
 //! This does *not* stop a page from firing a cross-origin `POST /api/captures`
 //! at a genuinely local address: `multipart/form-data` is a CORS-safelisted
 //! content type, so the write is a simple request that needs no preflight and
@@ -23,40 +31,55 @@ use axum::response::{IntoResponse, Response};
 
 use crate::state::AppState;
 
-/// Names that always mean "this machine".
-const LOOPBACK_HOSTS: [&str; 3] = ["localhost", "127.0.0.1", "[::1]"];
+/// The one name that means "this machine" without resolving anything. The
+/// loopback *addresses* need no entry here; they are covered as IP literals.
+const LOCALHOST: &str = "localhost";
 
 /// Take the hostname out of a `Host` value, dropping any port. IPv6 literals
 /// are bracketed (`[::1]:8787`), so the bracket - not the first colon - is what
 /// separates the address from the port.
+///
+/// Anything else after the bracket is malformed, and is handed back whole
+/// rather than trimmed to the part before it: `[::1]evil.example.com` must not
+/// reduce to a loopback address that the allowlist would then wave through.
 fn hostname_of(host: &str) -> &str {
-    if let Some(close) = host.rfind(']') {
-        return &host[..=close];
-    }
-    match host.split_once(':') {
-        Some((name, _port)) => name,
-        None => host,
+    let Some(rest) = host.strip_prefix('[') else {
+        return match host.split_once(':') {
+            Some((name, _port)) => name,
+            None => host,
+        };
+    };
+
+    match rest.find(']') {
+        Some(close) if rest[close + 1..].is_empty() || rest[close + 1..].starts_with(':') => {
+            &host[..=close + 1]
+        }
+        _ => host,
     }
 }
 
-/// Whether we answer to `name`: loopback, whatever we are bound to, or anything
-/// the operator listed for a reverse proxy.
+/// Whether `name` is an IP address rather than a hostname. Bracketed IPv6 is
+/// how a `Host` header carries one, so it is unwrapped before parsing.
+fn is_ip_literal(name: &str) -> bool {
+    match name.strip_prefix('[').and_then(|n| n.strip_suffix(']')) {
+        Some(inner) => inner.parse::<std::net::Ipv6Addr>().is_ok(),
+        None => name.parse::<std::net::IpAddr>().is_ok(),
+    }
+}
+
+/// Whether we answer to `name`: `localhost`, any address literal, the public
+/// URL's host, or anything else the operator listed.
 fn is_known(name: &str, state: &AppState) -> bool {
-    if LOOPBACK_HOSTS.iter().any(|h| h.eq_ignore_ascii_case(name)) {
+    if name.eq_ignore_ascii_case(LOCALHOST) || is_ip_literal(name) {
         return true;
     }
 
-    let bound = state.config.bind.ip();
-    // A wildcard bind answers to whatever name reaches it, so it can't
-    // contribute one of its own - the operator lists those explicitly.
-    if !bound.is_unspecified() {
-        let literal = match bound {
-            std::net::IpAddr::V4(v4) => v4.to_string(),
-            std::net::IpAddr::V6(v6) => format!("[{v6}]"),
-        };
-        if literal.eq_ignore_ascii_case(name) {
-            return true;
-        }
+    if state
+        .config
+        .public_url_host()
+        .is_some_and(|host| host.eq_ignore_ascii_case(name))
+    {
+        return true;
     }
 
     state
@@ -90,7 +113,8 @@ pub async fn require_known_host(
             (
                 StatusCode::MISDIRECTED_REQUEST,
                 "This Magpie does not answer to that hostname. If you reach it through a \
-                 reverse proxy, add the public name to MAGPIE_ALLOWED_HOSTS.\n",
+                 reverse proxy, set MAGPIE_PUBLIC_URL to the address you use, or list the \
+                 name in MAGPIE_ALLOWED_HOSTS.\n",
             )
                 .into_response()
         }
@@ -109,5 +133,40 @@ mod tests {
         assert_eq!(hostname_of("[::1]:8787"), "[::1]");
         assert_eq!(hostname_of("[::1]"), "[::1]");
         assert_eq!(hostname_of("[2001:db8::1]:443"), "[2001:db8::1]");
+    }
+
+    #[test]
+    fn a_bracketed_prefix_cannot_shadow_the_real_hostname() {
+        // Left trimmed to `[::1]` this would pass as loopback.
+        assert_eq!(
+            hostname_of("[::1]evil.example.com"),
+            "[::1]evil.example.com"
+        );
+        assert_eq!(hostname_of("[::1"), "[::1");
+    }
+
+    #[test]
+    fn address_literals_are_recognised_but_names_are_not() {
+        for literal in [
+            "127.0.0.1",
+            "192.168.1.50",
+            "10.0.0.8",
+            "[::1]",
+            "[fe80::1]",
+        ] {
+            assert!(is_ip_literal(literal), "{literal} is an address");
+        }
+        for name in ["localhost", "magpie.example.com", "evil.example.com", ""] {
+            assert!(
+                !is_ip_literal(name),
+                "{name} is a name, so it can be rebound"
+            );
+        }
+    }
+
+    #[test]
+    fn a_hostname_that_merely_looks_bracketed_is_not_an_address() {
+        assert!(!is_ip_literal("[not-an-address]"));
+        assert!(!is_ip_literal("[::1]evil.example.com"));
     }
 }

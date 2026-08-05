@@ -27,6 +27,7 @@ fn test_state_with(tweak: impl FnOnce(&mut Config)) -> (AppState, tempfile::Temp
         token: None,
         allowed_origins: vec![],
         allowed_hosts: vec![],
+        public_url: None,
         max_image_bytes: 5_000_000,
         log: "warn".into(),
         connect: false,
@@ -599,4 +600,68 @@ async fn the_right_token_trades_for_a_session_that_opens_the_collection() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn a_lan_address_reaches_an_instance_that_named_no_hostname() {
+    // Bound to everything, as a container or a LAN service is, with nothing in
+    // the allowlist. Reaching it by address must not need configuration first.
+    // A non-loopback bind forces auth on, so the extension's token comes too.
+    let (state, _dir) = test_state_with(|c| {
+        c.bind = "0.0.0.0:8787".parse().unwrap();
+        c.token = Some("s3cret".into());
+    });
+    let app = magpie::app(state);
+
+    for host in ["192.168.1.50:8787", "10.0.0.8", "[fe80::1]:8787"] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/")
+                    .header(header::HOST, host)
+                    .header(header::AUTHORIZATION, "Bearer s3cret")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK, "{host} reaches the app");
+    }
+
+    // A name still has to be vouched for, because a name is what gets rebound.
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/")
+                .header(header::HOST, "evil.example.com")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::MISDIRECTED_REQUEST);
+}
+
+#[tokio::test]
+async fn the_public_url_host_is_allowed_without_repeating_it() {
+    let (state, _dir) =
+        test_state_with(|c| c.public_url = Some("https://magpie.example.com".into()));
+    let app = magpie::app(state);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/")
+                .header(header::HOST, "magpie.example.com")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "naming the public URL is enough; the allowlist need not repeat it"
+    );
 }

@@ -40,6 +40,8 @@ async fn main() -> anyhow::Result<()> {
 
 /// Fail fast on foot-guns before opening the database (see `docs/usage.md`).
 fn check_startup_safety(config: &Config) -> anyhow::Result<()> {
+    config.validate()?;
+
     if !config.is_loopback() && config.token.is_none() {
         anyhow::bail!(
             "refusing to bind to non-loopback address {} without MAGPIE_TOKEN set - \

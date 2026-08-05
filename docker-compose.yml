@@ -15,9 +15,15 @@ services:
       MAGPIE_BIND: 0.0.0.0:8787
       MAGPIE_DATA_DIR: /data
       MAGPIE_TOKEN: ${MAGPIE_TOKEN:?set MAGPIE_TOKEN in .env, or run `make docker-up` to generate one}
-      # The public hostname when a reverse proxy fronts this, e.g.
-      # magpie.example.com. Loopback and the bind address are always accepted.
+      # The URL this is reached at when a reverse proxy fronts it, e.g.
+      # https://magpie.example.com. Its hostname is allowed automatically, and
+      # it is what `make connect` prints for the extension to pair with.
+      MAGPIE_PUBLIC_URL: ${MAGPIE_PUBLIC_URL:-}
+      # Further hostnames to answer to, beyond that one. Addresses always work.
       MAGPIE_ALLOWED_HOSTS: ${MAGPIE_ALLOWED_HOSTS:-}
+      # Extension origins allowed via CORS, e.g. chrome-extension://<id>. Not
+      # needed when the extension holds a host permission for this backend.
+      MAGPIE_ALLOWED_ORIGINS: ${MAGPIE_ALLOWED_ORIGINS:-}
       MAGPIE_LOG: ${MAGPIE_LOG:-info}
     volumes:
       # SQLite runs in WAL mode, whose locking is unreliable on NFS and SMB.
