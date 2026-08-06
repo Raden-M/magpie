@@ -17,18 +17,11 @@
 
 ---
 
-<!-- DEMO RECORDING -----------------------------------------------------------
-     Drag the video file into the GitHub README editor; GitHub uploads it and
-     leaves a https://github.com/user-attachments/... URL in its place. Put that
-     URL in the src below and delete these comment markers.
-
 <p align="center">
-  <video src="PASTE_THE_USER_ATTACHMENTS_URL_HERE" controls muted loop playsinline width="100%"></video>
+  <video src="https://github.com/user-attachments/assets/b4af4cdb-2b7f-4231-be9a-591b0751ab30" controls muted loop playsinline width="100%"></video>
 </p>
 
 <p align="center"><em>Highlight, keep, and find it again - the whole loop in under a minute.</em></p>
-
------------------------------------------------------------------------------ -->
 
 ## Get started
 
