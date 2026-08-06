@@ -32,5 +32,9 @@ magpie.toml
 .vscode/
 
 
+# Demo recordings and their intermediates. The README's demo lives on GitHub as a
+# user-attachments URL, so the binaries stay out of clone size.
+/media/
+
 # Local-only planning, design docs, working notes and scratch. Never committed.
 /.local/

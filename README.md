@@ -51,6 +51,9 @@ Then load the extension into Firefox, once:
 There's nothing to configure. The extension ships pointed at your own machine, and a local Magpie
 needs no token, so there are no settings to fill in and no pairing step.
 
+Already have somewhere to host things? The extension will point at any Magpie you run - see
+[on your own server](#other-ways-to-run-it) below.
+
 > Firefox drops a temporary add-on when it restarts, so you re-load it after a restart. Permanent,
 > auto-updating installs arrive with the first signed release.
 
@@ -97,11 +100,17 @@ path has a token and the from-source one doesn't.
 </details>
 
 <details>
-<summary><b>On a server</b> - reachable from other machines</summary>
+<summary><b>On your own server</b> - point the extension at a backend you host</summary>
 
-Magpie sits behind a reverse proxy that terminates TLS, guarded by a token. Set it up with
-[`docs/usage.md`](docs/usage.md#deploying-remotely), then paste the connect string into the
-extension. You sign in to the web UI once per browser.
+Nothing ties the extension to `127.0.0.1`. Run the backend on a VPS, a NAS, or whatever is already
+humming in the cupboard, put it behind a reverse proxy that terminates TLS, and paste the connect
+string it prints into the extension's **Backend URL**. Every browser you use then keeps into the
+same collection, reachable from anywhere you are; you sign in to the web UI once per browser.
+
+The extension asks for permission to reach the one address you name and nothing else - not every
+site you visit - so this costs a single prompt when you save it.
+[`docs/usage.md`](docs/usage.md#deploying-remotely) has the proxy config, the token, and an honest
+account of the security posture.
 
 </details>
 
