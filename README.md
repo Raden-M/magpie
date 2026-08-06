@@ -17,11 +17,9 @@
 
 ---
 
-<p align="center">
-  <video src="https://github.com/user-attachments/assets/b4af4cdb-2b7f-4231-be9a-591b0751ab30" controls muted loop playsinline width="100%"></video>
-</p>
+https://github.com/user-attachments/assets/b4af4cdb-2b7f-4231-be9a-591b0751ab30
 
-<p align="center"><em>Highlight, keep, and find it again - the whole loop in under a minute.</em></p>
+*Highlight, keep, and find it again - the whole loop in under a minute.*
 
 ## Get started
 
