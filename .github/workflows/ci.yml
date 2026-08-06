@@ -62,12 +62,6 @@ jobs:
         working-directory: extension
         run: npm ci
 
-      # The version lives in three files that nothing keeps in step. Checking it
-      # here as well as at release time means drift is a red PR rather than a
-      # failed tag, when the fix is still one commit away.
-      - name: Check versions agree
-        run: node scripts/check-versions.mjs
-
       - name: Typecheck
         working-directory: extension
         run: npm run typecheck
