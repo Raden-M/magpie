@@ -25,5 +25,9 @@ paths:
   disables the extension for every installed user until each re-accepts it.
 - MV3 service workers are ephemeral. Keep no long-lived in-memory state in `src/background/`;
   persist to `chrome.storage`.
+- The worker **cannot read the active tab's URL**: that needs the `tabs` permission, whose install
+  warning ("read your browsing history") is not worth a menu title. So the *page* announces itself
+  (`PAGE_STATE` in `shared/messages.ts`) whenever it becomes visible, and the worker only reacts.
+  Anything in `src/background/` that wants to know where the user is has to go through that.
 - The token lives in `chrome.storage.local`, never `sync`, so it is not uploaded to the browser
   vendor.

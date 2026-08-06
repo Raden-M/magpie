@@ -57,4 +57,6 @@ export interface Settings {
   backendUrl: string;
   token: string;
   defaultShade: string;
+  /** Sites Magpie stays out of entirely. Syntax in `shared/exclusions.ts`. */
+  excludedSites: string[];
 }

@@ -80,6 +80,7 @@ Magpie → Preferences works too):
   against a running container.
 - **Token** - empty for a local loopback backend, required for a remote one.
 - **Default shade** - the highlight colour used by the keyboard command and context menu.
+- **Excluded sites** - one per line, the places Magpie stays out of entirely.
 
 **Save** asks for permission to reach that backend and stores nothing if you decline - Magpie
 requests the one address you name rather than every site, which is why saving is what grants it.
@@ -92,6 +93,24 @@ requests the one address you name rather than every site, which is why saving is
 - **`Ctrl/Cmd+Shift+K`** keeps the current selection.
 
 A capture with no selection stores the page and its reader snapshot with zero highlights.
+
+### Switching Magpie off on a site
+
+Webmail, a chat app, an internal dashboard - anywhere a pill over every selection is noise rather
+than help. **Right-click the page → *Don't offer Magpie on this site***, and that site gets no pill,
+no *Keep selection* item, and no response to `Ctrl/Cmd+Shift+K`. The same menu offers it back.
+
+The full list is editable under **Excluded sites** in the settings, one entry per line:
+
+| Entry | Covers |
+| --- | --- |
+| `mail.google.com` | that host, every page on it |
+| `*.example.com` | `example.com` and every subdomain |
+| `example.com/app` | only pages under `/app` - for a PWA sharing a host with pages worth keeping |
+| `localhost:3000` | that port only; an entry without one matches any port |
+
+Entries are hosts, not URLs, though pasting a URL works - it is reduced to one. Nothing is captured
+from an excluded site, so this is also how you keep a site out of the collection entirely.
 
 ## Deploying remotely
 

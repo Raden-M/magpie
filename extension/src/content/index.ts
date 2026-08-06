@@ -4,8 +4,9 @@
 
 import { getSettings } from "../shared/config.js";
 import { errorMessage } from "../shared/errors.js";
+import { isExcluded } from "../shared/exclusions.js";
 import { ext } from "../shared/ext.js";
-import { TRIGGER_CAPTURE } from "../shared/messages.js";
+import { PAGE_STATE, TRIGGER_CAPTURE } from "../shared/messages.js";
 import type { CaptureResultMessage } from "../shared/messages.js";
 import type { Settings } from "../shared/types.js";
 import { buildCapture } from "./capture.js";
@@ -13,6 +14,7 @@ import { createUi } from "./menu.js";
 import { readSelection, selectionRect, type SelectionSnapshot } from "./select.js";
 
 let settings: Settings | null = null;
+let excluded = false;
 let lastSelection: SelectionSnapshot | null = null;
 let capturing = false;
 
@@ -20,10 +22,44 @@ const ui = createUi(onKeep, () => {
   lastSelection = null;
 });
 
-void getSettings().then((s) => (settings = s));
+function applySettings(s: Settings): void {
+  const first = settings === null;
+  const was = excluded;
+  settings = s;
+  excluded = isExcluded(location.href, s.excludedSites);
+  if (excluded) {
+    lastSelection = null;
+    ui.hidePill();
+  }
+  // Toggling from the context menu happens under the native menu with nothing
+  // else to show for it, so confirm it in the page - but never on load, where
+  // the state is not news.
+  if (!first && excluded !== was) {
+    // "ok" either way: the user asked for it and it worked. Red is for failure.
+    ui.showToast(
+      excluded ? "Magpie is switched off on this site." : "Magpie is back on this site.",
+      "ok",
+    );
+  }
+  announcePageState();
+}
+
+/** Tell the worker what this page is, so the context menu matches it. */
+function announcePageState(): void {
+  if (document.visibilityState !== "visible") return;
+  void ext.runtime.sendMessage({ type: PAGE_STATE, excluded }).catch(() => {
+    // The worker may be asleep with no listener yet; the next event re-announces.
+  });
+}
+
+void getSettings().then(applySettings);
 ext.storage.onChanged.addListener(() => {
-  void getSettings().then((s) => (settings = s));
+  void getSettings().then(applySettings);
 });
+document.addEventListener("visibilitychange", announcePageState);
+// Focusing a second window doesn't change visibility, and the menu is shared
+// across windows; re-announcing as the native menu opens keeps it honest.
+document.addEventListener("contextmenu", announcePageState, true);
 
 let debounceTimer: number | undefined;
 document.addEventListener("selectionchange", () => {
@@ -36,6 +72,7 @@ function sameSelection(a: SelectionSnapshot | null, b: SelectionSnapshot): boole
 }
 
 function updatePill(): void {
+  if (excluded) return;
   const snapshot = readSelection();
   const rect = selectionRect();
   if (snapshot && rect) {
@@ -55,7 +92,7 @@ function updatePill(): void {
 }
 
 async function onKeep(color: string, note: string | null): Promise<void> {
-  if (capturing) return;
+  if (capturing || excluded) return;
   const selection = lastSelection ?? readSelection();
   capturing = true;
   ui.setBusy(true);
@@ -90,6 +127,9 @@ async function onKeep(color: string, note: string | null): Promise<void> {
 
 ext.runtime.onMessage.addListener((message) => {
   if (message && message.type === TRIGGER_CAPTURE) {
-    void onKeep(settings?.defaultShade ?? "iridescent", null);
+    // The keyboard command reaches even an excluded page - the browser owns the
+    // shortcut. Say why nothing happened rather than swallowing the keystroke.
+    if (excluded) ui.showToast("Magpie is switched off on this site.", "error");
+    else void onKeep(settings?.defaultShade ?? "iridescent", null);
   }
 });

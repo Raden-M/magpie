@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS: Settings = {
   backendUrl: "http://127.0.0.1:8787",
   token: "",
   defaultShade: "iridescent",
+  excludedSites: [],
 };
 
 export async function getSettings(): Promise<Settings> {

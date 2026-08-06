@@ -2,6 +2,7 @@
 // request access to whichever backend was named, and test the connection.
 
 import { getSettings, setSettings } from "../shared/config.js";
+import { formatExclusions, parseExclusions } from "../shared/exclusions.js";
 import { ext } from "../shared/ext.js";
 import {
   normalizeBackendUrl,
@@ -12,6 +13,7 @@ import {
 const backendUrl = document.getElementById("backendUrl") as HTMLInputElement;
 const token = document.getElementById("token") as HTMLInputElement;
 const defaultShade = document.getElementById("defaultShade") as HTMLSelectElement;
+const excludedSites = document.getElementById("excludedSites") as HTMLTextAreaElement;
 const saveBtn = document.getElementById("save") as HTMLButtonElement;
 const testBtn = document.getElementById("test") as HTMLButtonElement;
 const status = document.getElementById("status") as HTMLSpanElement;
@@ -26,7 +28,16 @@ async function load(): Promise<void> {
   backendUrl.value = settings.backendUrl;
   token.value = settings.token;
   defaultShade.value = settings.defaultShade;
+  excludedSites.value = formatExclusions(settings.excludedSites);
 }
+
+// The context menu edits the same list, so reflect it while the page is open
+// rather than letting a stale textarea overwrite it on the next Save.
+ext.storage.onChanged.addListener((changes) => {
+  if (changes.excludedSites && document.activeElement !== excludedSites) {
+    excludedSites.value = formatExclusions((changes.excludedSites.newValue ?? []) as string[]);
+  }
+});
 
 /**
  * Ask for access to this backend, if we don't already have it.
@@ -83,11 +94,16 @@ async function save(): Promise<void> {
     return;
   }
 
+  const exclusions = parseExclusions(excludedSites.value);
   await setSettings({
     backendUrl: pairing.backendUrl,
     token: token.value.trim(),
     defaultShade: defaultShade.value,
+    excludedSites: exclusions,
   });
+  // Show what was actually stored: entries are tidied, and a line that parses
+  // to nothing disappearing is the only signal that it was never a rule.
+  excludedSites.value = formatExclusions(exclusions);
   setStatus("Saved.", "ok");
   window.setTimeout(() => setStatus(""), 2500);
 }

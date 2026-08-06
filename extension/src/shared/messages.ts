@@ -27,3 +27,17 @@ export interface TriggerCaptureMessage {
   type: "magpie-trigger-capture";
 }
 export const TRIGGER_CAPTURE = "magpie-trigger-capture" as const;
+
+/**
+ * Sent from the content script of the *visible* page to the service worker, so
+ * the context menu can name what clicking it will do.
+ *
+ * The page reports its own state rather than the worker reading `tab.url`:
+ * that would need the `tabs` permission, whose install warning ("read your
+ * browsing history") is a steep price for a menu title.
+ */
+export interface PageStateMessage {
+  type: "magpie-page-state";
+  excluded: boolean;
+}
+export const PAGE_STATE = "magpie-page-state" as const;
