@@ -61,11 +61,6 @@ Magpie saves the sentence **and** the page around it, on hardware you control, i
 outlives the site. Single-user, local-first, one binary and one folder of data - no account, no
 cloud, no telemetry.
 
-> A magpie's blue-green-purple is *structural colour*: the feather holds no blue pigment. The colour
-> is an interference effect that appears only when light catches the structure at the right angle,
-> against a black base. The interface works the same way: everything is quiet and grey, and the only
-> colour in the room is your highlights.
-
 ## Other ways to run it
 
 <details>
